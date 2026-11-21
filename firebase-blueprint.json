@@ -1,0 +1,189 @@
+{
+  "entities": {
+    "Admin": {
+      "title": "Admin",
+      "description": "Authorized administrator account in Nurses BD, keyed by lowercase verified Google email.",
+      "type": "object",
+      "properties": {
+        "fullName": {
+          "type": "string",
+          "description": "Administrator display name (2 to 80 characters)."
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "description": "Lowercase Google account email address matching the document ID."
+        },
+        "role": {
+          "type": "string",
+          "enum": ["SUPER_ADMIN", "MODERATOR"],
+          "description": "Administrative privilege level."
+        },
+        "assignedDivision": {
+          "type": "string",
+          "description": "Assigned Bangladesh division or All Bangladesh."
+        },
+        "addedBy": {
+          "type": "string",
+          "description": "Email or system identifier of the creator."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() upon creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on updates."
+        }
+      },
+      "required": [
+        "fullName",
+        "email",
+        "role",
+        "assignedDivision",
+        "addedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "Nurse": {
+      "title": "Nurse",
+      "description": "Registered Bangladesh nurse directory profile and approval workflow record.",
+      "type": "object",
+      "properties": {
+        "submittedByUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the submitting user or seeding admin."
+        },
+        "fullName": {
+          "type": "string",
+          "description": "Nurse full name (3 to 80 characters)."
+        },
+        "bnmcNumber": {
+          "type": "string",
+          "description": "Bangladesh Nursing & Midwifery Council registration number (4 to 30 characters)."
+        },
+        "designation": {
+          "type": "string",
+          "description": "Nursing role title (2 to 60 characters)."
+        },
+        "qualification": {
+          "type": "string",
+          "description": "Academic nursing qualification (2 to 80 characters)."
+        },
+        "specialty": {
+          "type": "string",
+          "description": "Clinical specialty area (2 to 60 characters)."
+        },
+        "division": {
+          "type": "string",
+          "description": "Bangladesh division name (2 to 40 characters)."
+        },
+        "district": {
+          "type": "string",
+          "description": "Bangladesh district name (2 to 40 characters)."
+        },
+        "hospitalName": {
+          "type": "string",
+          "description": "Hospital, clinic, or health facility name (3 to 120 characters)."
+        },
+        "phone": {
+          "type": "string",
+          "description": "Bangladeshi contact phone number (11 to 20 characters)."
+        },
+        "whatsapp": {
+          "type": "string",
+          "description": "Bangladeshi WhatsApp number (11 to 20 characters)."
+        },
+        "email": {
+          "type": "string",
+          "description": "Contact email address (0 to 120 characters)."
+        },
+        "bloodGroup": {
+          "type": "string",
+          "enum": ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"],
+          "description": "Nurse blood group."
+        },
+        "availabilityStatus": {
+          "type": "string",
+          "enum": ["ON_DUTY", "EMERGENCY_AVAILABLE", "OFF_DUTY"],
+          "description": "Current shift or emergency availability status."
+        },
+        "experienceYears": {
+          "type": "integer",
+          "description": "Years of clinical experience (0 to 60)."
+        },
+        "bio": {
+          "type": "string",
+          "description": "Short clinical summary or shift notes (0 to 400 characters)."
+        },
+        "approvalStatus": {
+          "type": "string",
+          "enum": ["PENDING", "APPROVED", "REJECTED"],
+          "description": "Admin moderation status; new non-admin registrations always start as PENDING."
+        },
+        "rejectionReason": {
+          "type": "string",
+          "description": "Admin rejection explanation (0 to 250 characters)."
+        },
+        "reviewedBy": {
+          "type": "string",
+          "description": "Email of the reviewing administrator (optional until reviewed)."
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of admin review via FieldValue.serverTimestamp() (optional until reviewed)."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on submission."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp set via FieldValue.serverTimestamp() on modification."
+        }
+      },
+      "required": [
+        "submittedByUid",
+        "fullName",
+        "bnmcNumber",
+        "designation",
+        "qualification",
+        "specialty",
+        "division",
+        "district",
+        "hospitalName",
+        "phone",
+        "whatsapp",
+        "email",
+        "bloodGroup",
+        "availabilityStatus",
+        "experienceYears",
+        "bio",
+        "approvalStatus",
+        "rejectionReason",
+        "createdAt",
+        "updatedAt"
+      ]
+    }
+  },
+  "firestore": {
+    "/admins/{adminEmail}": {
+      "schema": {
+        "$ref": "#/entities/Admin"
+      },
+      "description": "Role-based access registry of administrators keyed by verified lowercase Google email."
+    },
+    "/nurses/{nurseId}": {
+      "schema": {
+        "$ref": "#/entities/Nurse"
+      },
+      "description": "Registered nurses directory across Bangladesh with approval workflow."
+    }
+  }
+}

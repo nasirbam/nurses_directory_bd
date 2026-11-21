@@ -1,0 +1,6 @@
+{
+  "name": "Nurses BD",
+  "description": "Bangladesh Nurses E-Directory for quick nurse discovery, communication, registration approval, and admin analytics.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

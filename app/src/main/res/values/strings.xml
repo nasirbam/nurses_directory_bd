@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">Nurses BD</string>
+    <string name="nav_directory">Directory</string>
+    <string name="nav_register">Register</string>
+    <string name="nav_admin">Admin</string>
+    <string name="hero_banner_desc">Bangladesh Nurses E-Directory network illustration</string>
+    <string name="action_call">Call</string>
+    <string name="action_sms">SMS</string>
+    <string name="action_whatsapp">WhatsApp</string>
+    <string name="action_email">Email</string>
+    <string name="action_share">Share</string>
+    <string name="action_copy">Copy</string>
+</resources>

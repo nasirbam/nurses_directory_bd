@@ -1,0 +1,206 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 1. Global Default-Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Global Security & Validation Primitives
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasVerifiedEmail() {
+      return isSignedIn() &&
+             request.auth.token.email is string &&
+             request.auth.token.email_verified == true;
+    }
+
+    function normalizedEmail() {
+      return request.auth.token.email.lower();
+    }
+
+    function isValidId(id) {
+      return id is string &&
+             id.size() >= 1 &&
+             id.size() <= 128 &&
+             id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidEmailId(id) {
+      return id is string &&
+             id.size() >= 5 &&
+             id.size() <= 128 &&
+             id.matches('^[a-z0-9._%+\\-]+@[a-z0-9.\\-]+\\.[a-z]{2,}$');
+    }
+
+    function isBootstrapAdmin() {
+      return hasVerifiedEmail() && normalizedEmail() == 'mdnasirnaznin@gmail.com';
+    }
+
+    function isAdmin() {
+      return isBootstrapAdmin() || (
+        hasVerifiedEmail() &&
+        exists(/databases/$(database)/documents/admins/$(normalizedEmail()))
+      );
+    }
+
+    function isSuperAdmin() {
+      return isBootstrapAdmin() || (
+        hasVerifiedEmail() &&
+        exists(/databases/$(database)/documents/admins/$(normalizedEmail())) &&
+        get(/databases/$(database)/documents/admins/$(normalizedEmail())).data.role == 'SUPER_ADMIN'
+      );
+    }
+
+    // 3. Entity Validation Blueprints
+    function isValidAdmin(data) {
+      return data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 80 &&
+             data.email is string && isValidEmailId(data.email) &&
+             data.role in ['SUPER_ADMIN', 'MODERATOR'] &&
+             data.assignedDivision is string && data.assignedDivision.size() >= 2 && data.assignedDivision.size() <= 50 &&
+             data.addedBy is string && data.addedBy.size() >= 2 && data.addedBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidNurse(data) {
+      return data.submittedByUid is string && data.submittedByUid.size() >= 1 && data.submittedByUid.size() <= 128 &&
+             data.fullName is string && data.fullName.size() >= 3 && data.fullName.size() <= 80 &&
+             data.bnmcNumber is string && data.bnmcNumber.size() >= 4 && data.bnmcNumber.size() <= 30 &&
+             data.designation is string && data.designation.size() >= 2 && data.designation.size() <= 60 &&
+             data.qualification is string && data.qualification.size() >= 2 && data.qualification.size() <= 80 &&
+             data.specialty is string && data.specialty.size() >= 2 && data.specialty.size() <= 60 &&
+             data.division is string && data.division.size() >= 2 && data.division.size() <= 40 &&
+             data.district is string && data.district.size() >= 2 && data.district.size() <= 40 &&
+             data.hospitalName is string && data.hospitalName.size() >= 3 && data.hospitalName.size() <= 120 &&
+             data.phone is string && data.phone.size() >= 11 && data.phone.size() <= 20 &&
+             data.whatsapp is string && data.whatsapp.size() >= 11 && data.whatsapp.size() <= 20 &&
+             data.email is string && data.email.size() <= 120 &&
+             data.bloodGroup in ['A+', 'A-', 'B+', 'B-', 'AB+', 'AB-', 'O+', 'O-'] &&
+             data.availabilityStatus in ['ON_DUTY', 'EMERGENCY_AVAILABLE', 'OFF_DUTY'] &&
+             data.experienceYears is int && data.experienceYears >= 0 && data.experienceYears <= 60 &&
+             data.bio is string && data.bio.size() <= 400 &&
+             data.approvalStatus in ['PENDING', 'APPROVED', 'REJECTED'] &&
+             data.rejectionReason is string && data.rejectionReason.size() <= 250 &&
+             (!('reviewedBy' in data) || data.reviewedBy == null || (data.reviewedBy is string && data.reviewedBy.size() <= 128)) &&
+             (!('reviewedAt' in data) || data.reviewedAt == null || (data.reviewedAt is timestamp && data.reviewedAt <= request.time)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    // 4. Admins Collection Rules
+    match /admins/{adminEmail} {
+      allow get: if hasVerifiedEmail() && isValidEmailId(adminEmail) && (
+        normalizedEmail() == adminEmail || isAdmin()
+      );
+      allow list: if isAdmin();
+
+      allow create: if hasVerifiedEmail() &&
+                       isValidEmailId(adminEmail) &&
+                       incoming().keys().hasAll(['fullName', 'email', 'role', 'assignedDivision', 'addedBy', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['fullName', 'email', 'role', 'assignedDivision', 'addedBy', 'createdAt', 'updatedAt']) &&
+                       incoming().email == adminEmail &&
+                       isValidAdmin(incoming()) &&
+                       (
+                         isSuperAdmin() ||
+                         (isBootstrapAdmin() && adminEmail == normalizedEmail() && incoming().role == 'SUPER_ADMIN')
+                       );
+
+      allow update: if hasVerifiedEmail() &&
+                       isValidEmailId(adminEmail) &&
+                       isValidAdmin(incoming()) &&
+                       isSuperAdmin() &&
+                       incoming().email == existing().email &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly(['fullName', 'role', 'assignedDivision', 'updatedAt']);
+
+      allow delete: if hasVerifiedEmail() &&
+                       isValidEmailId(adminEmail) &&
+                       isSuperAdmin() &&
+                       adminEmail != normalizedEmail() &&
+                       adminEmail != 'mdnasirnaznin@gmail.com';
+    }
+
+    // 5. Nurses Collection Rules
+    match /nurses/{nurseId} {
+      allow get: if isSignedIn() && isValidId(nurseId) && (
+        existing().approvalStatus == 'APPROVED' ||
+        existing().submittedByUid == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        existing().approvalStatus == 'APPROVED' ||
+        existing().submittedByUid == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(nurseId) &&
+                       incoming().keys().hasAll([
+                         'submittedByUid', 'fullName', 'bnmcNumber', 'designation',
+                         'qualification', 'specialty', 'division', 'district',
+                         'hospitalName', 'phone', 'whatsapp', 'email',
+                         'bloodGroup', 'availabilityStatus', 'experienceYears',
+                         'bio', 'approvalStatus', 'rejectionReason',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'submittedByUid', 'fullName', 'bnmcNumber', 'designation',
+                         'qualification', 'specialty', 'division', 'district',
+                         'hospitalName', 'phone', 'whatsapp', 'email',
+                         'bloodGroup', 'availabilityStatus', 'experienceYears',
+                         'bio', 'approvalStatus', 'rejectionReason',
+                         'reviewedBy', 'reviewedAt', 'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidNurse(incoming()) &&
+                       incoming().submittedByUid == request.auth.uid &&
+                       (
+                         isAdmin() ||
+                         (
+                           incoming().approvalStatus == 'PENDING' &&
+                           incoming().rejectionReason == '' &&
+                           (!('reviewedBy' in incoming()) || incoming().reviewedBy == null) &&
+                           (!('reviewedAt' in incoming()) || incoming().reviewedAt == null)
+                         )
+                       );
+
+      allow update: if isSignedIn() &&
+                       isValidId(nurseId) &&
+                       isValidNurse(incoming()) &&
+                       incoming().submittedByUid == existing().submittedByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       (
+                         (
+                           isAdmin() &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'approvalStatus', 'rejectionReason', 'reviewedBy', 'reviewedAt',
+                             'availabilityStatus', 'updatedAt'
+                           ])
+                         ) ||
+                         (
+                           existing().submittedByUid == request.auth.uid &&
+                           existing().approvalStatus != 'REJECTED' &&
+                           incoming().diff(existing()).affectedKeys().hasOnly([
+                             'availabilityStatus', 'phone', 'whatsapp', 'hospitalName', 'bio', 'updatedAt'
+                           ])
+                         )
+                       );
+
+      allow delete: if isSignedIn() && isValidId(nurseId) && (
+        isAdmin() ||
+        (existing().submittedByUid == request.auth.uid && existing().approvalStatus == 'PENDING')
+      );
+    }
+  }
+}
