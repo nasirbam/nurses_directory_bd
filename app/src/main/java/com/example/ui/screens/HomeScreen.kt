@@ -31,6 +31,7 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -66,7 +67,8 @@ fun HomeScreen(
     onLoginClick: () -> Unit,
     onRegisterClick: () -> Unit,
     onAdminClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    firebaseConfigured: Boolean = true
 ) {
     Box(
         modifier = modifier
@@ -225,6 +227,36 @@ fun HomeScreen(
                 modifier = Modifier.widthIn(max = 600.dp),
                 verticalArrangement = Arrangement.spacedBy(16.dp)
             ) {
+                if (!firebaseConfigured) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("firebase_missing_warning"),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.errorContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Warning,
+                                contentDescription = "Configuration Warning",
+                                tint = MaterialTheme.colorScheme.onErrorContainer,
+                                modifier = Modifier.size(22.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Text(
+                                text = "এই APK-তে Firebase কনফিগ (google-services.json) যুক্ত নেই। লাইভ লগইন ও ডাটাবেজ চালু করতে AI Studio থেকে APK ডাউনলোড করুন অথবা GitHub Secrets-এ GOOGLE_SERVICES_JSON যোগ করুন।",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onErrorContainer
+                            )
+                        }
+                    }
+                }
+
                 // Nursing Hero Card
                 Card(
                     modifier = Modifier.fillMaxWidth(),

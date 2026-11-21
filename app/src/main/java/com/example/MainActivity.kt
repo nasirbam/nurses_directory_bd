@@ -1,5 +1,6 @@
 package com.example
 
+import android.content.Context
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
@@ -86,8 +87,11 @@ import com.example.ui.screens.NurseLoginScreen
 import com.example.ui.screens.RegisterScreen
 import com.example.ui.theme.NursesBDTheme
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
+import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.auth
 import com.google.firebase.firestore.FirebaseFirestore
+import kotlinx.coroutines.flow.flowOf
 import kotlinx.coroutines.launch
 
 object Routes {
@@ -119,28 +123,42 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+private fun resolveFirebaseAuthOrNull(context: Context): FirebaseAuth? {
+    return runCatching {
+        if (FirebaseApp.getApps(context).isEmpty()) {
+            FirebaseApp.initializeApp(context)
+        }
+        if (FirebaseApp.getApps(context).isNotEmpty()) Firebase.auth else null
+    }.getOrNull()
+}
+
 @Composable
 fun AppNavigation() {
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
-    val auth = Firebase.auth
-    val currentUser by auth.authStateFlow().collectAsStateWithLifecycle(initialValue = auth.currentUser)
+    val auth = remember(context) { resolveFirebaseAuthOrNull(context) }
+    val currentUser by remember(auth) {
+        auth?.authStateFlow() ?: flowOf(null)
+    }.collectAsStateWithLifecycle(initialValue = auth?.currentUser)
     var preferredStartRoute by remember { mutableStateOf(Routes.DIRECTORY) }
 
-    LaunchedEffect(Unit) {
-        attemptAutoSignIn(
-            context = context,
-            credentialManager = credentialManager,
-            onAuthSuccess = {},
-            onUnauthenticated = {},
-            scope = scope
-        )
+    LaunchedEffect(auth) {
+        if (auth != null) {
+            attemptAutoSignIn(
+                context = context,
+                credentialManager = credentialManager,
+                onAuthSuccess = {},
+                onUnauthenticated = {},
+                scope = scope
+            )
+        }
     }
 
     val user = currentUser
-    if (user == null) {
+    if (auth == null || user == null) {
         GuestPortal(
+            firebaseConfigured = auth != null,
             onAuthSuccessFromRoute = { targetRoute ->
                 preferredStartRoute = targetRoute
             }
@@ -179,6 +197,7 @@ fun AppNavigation() {
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 private fun GuestPortal(
+    firebaseConfigured: Boolean,
     onAuthSuccessFromRoute: (String) -> Unit
 ) {
     val guestNavController = rememberNavController()
@@ -228,6 +247,7 @@ private fun GuestPortal(
         ) {
             composable(Routes.HOME) {
                 HomeScreen(
+                    firebaseConfigured = firebaseConfigured,
                     onLoginClick = { guestNavController.navigate(Routes.NURSE_LOGIN) },
                     onRegisterClick = { guestNavController.navigate(Routes.REGISTER) },
                     onAdminClick = { guestNavController.navigate(Routes.ADMIN) }

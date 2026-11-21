@@ -39,6 +39,7 @@ import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential.Companion.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
 import com.google.firebase.Firebase
+import com.google.firebase.FirebaseApp
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.auth.GoogleAuthProvider
@@ -58,6 +59,15 @@ internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     }
     addAuthStateListener(listener)
     awaitClose { removeAuthStateListener(listener) }
+}
+
+private fun isFirebaseAvailable(context: Context): Boolean {
+    return runCatching {
+        if (FirebaseApp.getApps(context).isEmpty()) {
+            FirebaseApp.initializeApp(context)
+        }
+        FirebaseApp.getApps(context).isNotEmpty()
+    }.getOrDefault(false)
 }
 
 @SuppressLint("DiscouragedApi")
@@ -80,6 +90,10 @@ fun attemptAutoSignIn(
     onUnauthenticated: () -> Unit,
     scope: CoroutineScope
 ) {
+    if (!isFirebaseAvailable(context)) {
+        onUnauthenticated()
+        return
+    }
     if (Firebase.auth.currentUser != null) {
         onAuthSuccess()
         return
@@ -125,6 +139,10 @@ fun onGoogleSignInClicked(
     val activity = context as? Activity
     if (activity == null) {
         onAuthError("Activity context is required for Google Sign-In.")
+        return
+    }
+    if (!isFirebaseAvailable(context)) {
+        onAuthError("Firebase config missing in this APK build. Download APK from AI Studio or add GOOGLE_SERVICES_JSON in GitHub Secrets.")
         return
     }
     val clientId = resolveDefaultWebClientId(context)
