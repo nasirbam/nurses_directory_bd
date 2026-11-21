@@ -15,7 +15,7 @@ This is a native Android Kotlin app (not a web app, so GitHub Pages does not app
 3. Publish the downloadable APK under **Releases** (`latest-apk`) and **Actions** artifacts.
 
 ## Local Build
-Requires JDK 17+, Android SDK (API 36), and Gradle 9.3.1:
+Requires JDK 21+, Android SDK (API 36), and Gradle 9.3.1:
 ```bash
 base64 -d debug.keystore.base64 > debug.keystore
 gradle :app:testDebugUnitTest :app:assembleDebug
