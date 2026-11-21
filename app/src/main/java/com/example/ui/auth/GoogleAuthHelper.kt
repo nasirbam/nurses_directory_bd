@@ -3,6 +3,7 @@ package com.example.ui.auth
 import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
+import android.content.ContextWrapper
 import android.util.Log
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -34,6 +35,8 @@ import androidx.credentials.CredentialManager
 import androidx.credentials.CustomCredential
 import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -59,6 +62,12 @@ internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     }
     addAuthStateListener(listener)
     awaitClose { removeAuthStateListener(listener) }
+}
+
+private tailrec fun Context.findActivity(): Activity? = when (this) {
+    is Activity -> this
+    is ContextWrapper -> baseContext.findActivity()
+    else -> null
 }
 
 private fun isFirebaseAvailable(context: Context): Boolean {
@@ -136,7 +145,7 @@ fun onGoogleSignInClicked(
     scope: CoroutineScope,
     onAuthCancelled: () -> Unit = {}
 ) {
-    val activity = context as? Activity
+    val activity = context.findActivity()
     if (activity == null) {
         onAuthError("Activity context is required for Google Sign-In.")
         return
@@ -166,8 +175,14 @@ fun onGoogleSignInClicked(
                 onAuthError("Unexpected credential type returned from Credential Manager.")
             }
         } catch (e: GetCredentialCancellationException) {
-            Log.w("Auth", "Google Sign-In flow cancelled or dismissed: ${e.message}", e)
+            Log.w("Auth", "Google Sign-In flow cancelled or rejected (check SHA-1 / Play Services): ${e.message}", e)
             onAuthCancelled()
+        } catch (e: NoCredentialException) {
+            Log.w("Auth", "No Google credentials available: ${e.message}", e)
+            onAuthError("No Google account available on this device or Play Services credential unavailable. Add a Google account in device Settings.")
+        } catch (e: GetCredentialException) {
+            Log.e("Auth", "Credential Manager error (${e.type}): ${e.errorMessage}", e)
+            onAuthError("Google Sign-In error (${e.type}): ${e.errorMessage ?: "Check APK SHA-1 fingerprint & Play Services"}")
         } catch (e: Exception) {
             Log.e("Auth", "Google Sign-In failed", e)
             onAuthError(e.localizedMessage ?: "Sign in failed")
@@ -222,7 +237,13 @@ fun GoogleSignInButton(
                     onAuthError(msg)
                 },
                 scope = scope,
-                onAuthCancelled = { isLoading = false }
+                onAuthCancelled = {
+                    isLoading = false
+                    onAuthError(
+                        "সাইন-ইন সম্পন্ন হয়নি (বাতিল হয়েছে অথবা APK-র SHA-1 কী Firebase-এর সাথে মেলেনি)। " +
+                            "রিলিজ APK হলে Firebase Console-এ Release SHA-1 যোগ করুন অথবা GitHub Debug APK ব্যবহার করুন।"
+                    )
+                }
             )
         },
         enabled = !isLoading,
