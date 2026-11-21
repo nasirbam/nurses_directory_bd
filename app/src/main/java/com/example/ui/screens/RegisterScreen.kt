@@ -207,6 +207,11 @@ fun RegisterScreen(
             BangladeshData.districtsByDivision[BangladeshData.divisions.first()]?.firstOrNull() ?: "Dhaka"
         )
     }
+    var selectedUpazila by remember {
+        mutableStateOf(
+            BangladeshData.upazilasForDistrict("Dhaka").firstOrNull() ?: "Shahbagh"
+        )
+    }
     var selectedDesignation by remember { mutableStateOf(BangladeshData.designations.first()) }
     var selectedQualification by remember { mutableStateOf(BangladeshData.qualifications.first()) }
     var selectedSpecialty by remember { mutableStateOf(BangladeshData.specialties.first()) }
@@ -222,6 +227,9 @@ fun RegisterScreen(
 
     val availableDistricts = remember(selectedDivision) {
         BangladeshData.districtsByDivision[selectedDivision] ?: listOf(selectedDivision)
+    }
+    val availableUpazilas = remember(selectedDistrict) {
+        BangladeshData.upazilasForDistrict(selectedDistrict)
     }
 
     fun validateFields(): RegistrationFieldErrors {
@@ -458,7 +466,9 @@ fun RegisterScreen(
                         options = BangladeshData.divisions,
                         onSelect = { div ->
                             selectedDivision = div
-                            selectedDistrict = BangladeshData.districtsByDivision[div]?.firstOrNull() ?: div
+                            val nextDist = BangladeshData.districtsByDivision[div]?.firstOrNull() ?: div
+                            selectedDistrict = nextDist
+                            selectedUpazila = BangladeshData.upazilasForDistrict(nextDist).firstOrNull() ?: "$nextDist Sadar"
                         },
                         modifier = Modifier.weight(1f)
                     )
@@ -467,10 +477,21 @@ fun RegisterScreen(
                         label = "District *",
                         selected = selectedDistrict,
                         options = availableDistricts,
-                        onSelect = { selectedDistrict = it },
+                        onSelect = { dist ->
+                            selectedDistrict = dist
+                            selectedUpazila = BangladeshData.upazilasForDistrict(dist).firstOrNull() ?: "$dist Sadar"
+                        },
                         modifier = Modifier.weight(1f)
                     )
                 }
+
+                FormDropdownField(
+                    label = "Upazila / Thana *",
+                    selected = selectedUpazila,
+                    options = availableUpazilas,
+                    onSelect = { selectedUpazila = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 OutlinedTextField(
                     value = hospitalName,
@@ -587,6 +608,7 @@ fun RegisterScreen(
                         specialty = selectedSpecialty,
                         division = selectedDivision,
                         district = selectedDistrict,
+                        upazila = selectedUpazila,
                         hospitalName = hospitalName,
                         phone = phone,
                         whatsapp = if (whatsappSameAsPhone) phone else whatsapp,

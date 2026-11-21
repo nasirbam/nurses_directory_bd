@@ -85,6 +85,10 @@
           "type": "string",
           "description": "Bangladesh district name (2 to 40 characters)."
         },
+        "upazila": {
+          "type": "string",
+          "description": "Bangladesh upazila or thana name (0 to 50 characters)."
+        },
         "hospitalName": {
           "type": "string",
           "description": "Hospital, clinic, or health facility name (3 to 120 characters)."

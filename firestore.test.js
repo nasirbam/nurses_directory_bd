@@ -33,6 +33,7 @@ function validNurseCreatePayload(uid, overrides = {}) {
     specialty: "ICU & Critical Care",
     division: "Dhaka",
     district: "Dhaka",
+    upazila: "Shahbagh",
     hospitalName: "Dhaka Medical College Hospital",
     phone: "01711450218",
     whatsapp: "01711450218",
@@ -161,6 +162,18 @@ test("Nurse registration enforces PENDING status, UID ownership, and rejects @Do
         })
       )
   );
+
+  // Oversized upazila (>50 chars) fails
+  await assertFails(
+    aliceDb
+      .collection("nurses")
+      .doc("nurse_alice_bad_upazila")
+      .set(
+        validNurseCreatePayload(ALICE_UID, {
+          upazila: "U".repeat(55),
+        })
+      )
+  );
 });
 
 test("PII & Query Trust: non-admin can query APPROVED or own submissions, never other PENDING docs or unfiltered list", async () => {
@@ -220,6 +233,7 @@ test("Update rules: owner can update safe profile fields only; cannot self-appro
   await assertSucceeds(
     aliceDb.collection("nurses").doc("alice_app").update({
       availabilityStatus: "EMERGENCY_AVAILABLE",
+      upazila: "Dhanmondi",
       hospitalName: "BSMMU Dhaka",
       updatedAt: new Date(Date.now() - 1000),
     })

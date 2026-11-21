@@ -49,5 +49,8 @@ class NursesRegistrationRepositoryTest {
 
         assertEquals(8, BangladeshData.divisions.size)
         assertEquals(64, BangladeshData.districtsByDivision.values.sumOf { it.size })
+        val allDistricts = BangladeshData.districtsByDivision.values.flatten()
+        assertTrue(allDistricts.all { BangladeshData.upazilasForDistrict(it).isNotEmpty() })
+        assertTrue("Shahbagh" in BangladeshData.upazilasForDistrict("Dhaka"))
     }
 }

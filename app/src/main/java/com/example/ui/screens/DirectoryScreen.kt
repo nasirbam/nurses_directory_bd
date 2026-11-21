@@ -28,6 +28,8 @@ import androidx.compose.material.icons.filled.Bloodtype
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocalHospital
+import androidx.compose.material.icons.filled.LocationCity
+import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.VerifiedUser
@@ -76,6 +78,9 @@ fun DirectoryScreen(
     uiState: DirectoryUiState,
     onSearchQueryChange: (String) -> Unit,
     onSelectDivision: (String) -> Unit,
+    onSelectDistrict: (String) -> Unit,
+    onSelectUpazila: (String) -> Unit,
+    onSelectHospital: (String) -> Unit,
     onSelectSpecialty: (String) -> Unit,
     onSelectBloodGroup: (String) -> Unit,
     onToggleEmergencyOnly: () -> Unit,
@@ -84,11 +89,17 @@ fun DirectoryScreen(
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
+    var showDistrictMenu by remember { mutableStateOf(false) }
+    var showUpazilaMenu by remember { mutableStateOf(false) }
+    var showHospitalMenu by remember { mutableStateOf(false) }
     var showSpecialtyMenu by remember { mutableStateOf(false) }
     var showBloodMenu by remember { mutableStateOf(false) }
 
     val divisionsWithAll = remember { listOf("All") + BangladeshData.divisions }
-    val hasActiveExtraFilter = uiState.filters.selectedSpecialty != "All" ||
+    val hasActiveExtraFilter = uiState.filters.selectedDistrict != "All" ||
+        uiState.filters.selectedUpazila != "All" ||
+        uiState.filters.selectedHospital != "All" ||
+        uiState.filters.selectedSpecialty != "All" ||
         uiState.filters.selectedBloodGroup != "All" ||
         uiState.filters.emergencyOnly
 
@@ -193,7 +204,7 @@ fun DirectoryScreen(
                         .testTag("directory_search_input"),
                     placeholder = {
                         Text(
-                            "Search name, hospital, district, BNMC no...",
+                            "Search by Name, Hospital, or Mobile No...",
                             maxLines = 1,
                             overflow = TextOverflow.Ellipsis
                         )
@@ -247,6 +258,158 @@ fun DirectoryScreen(
                                 ),
                                 modifier = Modifier.testTag("division_chip_$division")
                             )
+                        }
+                    }
+
+                    // Cascading Location Filter Row (District / Jela -> Upazila -> Hospital)
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        item {
+                            Box {
+                                FilterChip(
+                                    selected = uiState.filters.selectedDistrict != "All",
+                                    onClick = { showDistrictMenu = true },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.LocationCity,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            if (uiState.filters.selectedDistrict == "All") "Jela (District)"
+                                            else uiState.filters.selectedDistrict
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ),
+                                    modifier = Modifier.testTag("district_filter_chip")
+                                )
+                                DropdownMenu(
+                                    expanded = showDistrictMenu,
+                                    onDismissRequest = { showDistrictMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("All Districts (Jela)") },
+                                        onClick = {
+                                            onSelectDistrict("All")
+                                            showDistrictMenu = false
+                                        }
+                                    )
+                                    uiState.availableDistricts.forEach { district ->
+                                        DropdownMenuItem(
+                                            text = { Text(district) },
+                                            onClick = {
+                                                onSelectDistrict(district)
+                                                showDistrictMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Box {
+                                FilterChip(
+                                    selected = uiState.filters.selectedUpazila != "All",
+                                    onClick = { showUpazilaMenu = true },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.LocationOn,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            if (uiState.filters.selectedUpazila == "All") "Upazila"
+                                            else uiState.filters.selectedUpazila
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ),
+                                    modifier = Modifier.testTag("upazila_filter_chip")
+                                )
+                                DropdownMenu(
+                                    expanded = showUpazilaMenu,
+                                    onDismissRequest = { showUpazilaMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("All Upazilas") },
+                                        onClick = {
+                                            onSelectUpazila("All")
+                                            showUpazilaMenu = false
+                                        }
+                                    )
+                                    uiState.availableUpazilas.forEach { upazila ->
+                                        DropdownMenuItem(
+                                            text = { Text(upazila) },
+                                            onClick = {
+                                                onSelectUpazila(upazila)
+                                                showUpazilaMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
+                        }
+
+                        item {
+                            Box {
+                                FilterChip(
+                                    selected = uiState.filters.selectedHospital != "All",
+                                    onClick = { showHospitalMenu = true },
+                                    leadingIcon = {
+                                        Icon(
+                                            Icons.Filled.LocalHospital,
+                                            contentDescription = null,
+                                            modifier = Modifier.size(16.dp)
+                                        )
+                                    },
+                                    label = {
+                                        Text(
+                                            if (uiState.filters.selectedHospital == "All") "Hospital"
+                                            else uiState.filters.selectedHospital,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis
+                                        )
+                                    },
+                                    colors = FilterChipDefaults.filterChipColors(
+                                        selectedContainerColor = MaterialTheme.colorScheme.secondaryContainer,
+                                        selectedLabelColor = MaterialTheme.colorScheme.onSecondaryContainer
+                                    ),
+                                    modifier = Modifier.testTag("hospital_filter_chip")
+                                )
+                                DropdownMenu(
+                                    expanded = showHospitalMenu,
+                                    onDismissRequest = { showHospitalMenu = false }
+                                ) {
+                                    DropdownMenuItem(
+                                        text = { Text("All Hospitals") },
+                                        onClick = {
+                                            onSelectHospital("All")
+                                            showHospitalMenu = false
+                                        }
+                                    )
+                                    uiState.availableHospitals.forEach { hospital ->
+                                        DropdownMenuItem(
+                                            text = { Text(hospital) },
+                                            onClick = {
+                                                onSelectHospital(hospital)
+                                                showHospitalMenu = false
+                                            }
+                                        )
+                                    }
+                                }
+                            }
                         }
                     }
 
@@ -432,7 +595,7 @@ fun DirectoryScreen(
                                 )
                                 Spacer(Modifier.height(4.dp))
                                 Text(
-                                    text = "Try clearing filters or searching another district or hospital.",
+                                    text = "Try clearing filters or searching another name, hospital, upazila, or mobile number.",
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )

@@ -30,6 +30,7 @@ data class NurseEntity(
     val specialty: String = "",
     val division: String = "",
     val district: String = "",
+    val upazila: String = "",
     val hospitalName: String = "",
     val phone: String = "",
     val whatsapp: String = "",

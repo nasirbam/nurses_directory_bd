@@ -38,6 +38,9 @@ sealed interface UiState<out T> {
 data class DirectoryFilterState(
     val searchQuery: String = "",
     val selectedDivision: String = "All",
+    val selectedDistrict: String = "All",
+    val selectedUpazila: String = "All",
+    val selectedHospital: String = "All",
     val selectedSpecialty: String = "All",
     val selectedBloodGroup: String = "All",
     val emergencyOnly: Boolean = false
@@ -48,6 +51,9 @@ data class DirectoryUiState(
     val errorMessage: String? = null,
     val totalVerifiedCount: Int = 0,
     val filteredNurses: List<NurseEntity> = emptyList(),
+    val availableDistricts: List<String> = emptyList(),
+    val availableUpazilas: List<String> = emptyList(),
+    val availableHospitals: List<String> = emptyList(),
     val filters: DirectoryFilterState = DirectoryFilterState()
 )
 
@@ -241,19 +247,66 @@ class NursesViewModel(
             )
             is UiState.Success -> {
                 val approved = approvedState.data
+                val districtsForDivision = if (filters.selectedDivision == "All") {
+                    BangladeshData.districtsByDivision.values.flatten().distinct().sorted()
+                } else {
+                    BangladeshData.districtsByDivision[filters.selectedDivision] ?: emptyList()
+                }
+                val upazilasForSelection = when {
+                    filters.selectedDistrict != "All" -> {
+                        val staticUpazilas = BangladeshData.upazilasForDistrict(filters.selectedDistrict)
+                        val dynamicUpazilas = approved
+                            .filter { it.district.equals(filters.selectedDistrict, ignoreCase = true) && it.upazila.isNotBlank() }
+                            .map { it.upazila }
+                        (staticUpazilas + dynamicUpazilas).distinct()
+                    }
+                    filters.selectedDivision != "All" -> {
+                        approved
+                            .filter { it.division.equals(filters.selectedDivision, ignoreCase = true) && it.upazila.isNotBlank() }
+                            .map { it.upazila }
+                            .distinct()
+                            .sorted()
+                    }
+                    else -> {
+                        approved.mapNotNull { it.upazila.takeIf(String::isNotBlank) }.distinct().sorted()
+                    }
+                }
+                val hospitalsForSelection = approved
+                    .filter { nurse ->
+                        (filters.selectedDivision == "All" || nurse.division.equals(filters.selectedDivision, ignoreCase = true)) &&
+                            (filters.selectedDistrict == "All" || nurse.district.equals(filters.selectedDistrict, ignoreCase = true)) &&
+                            (filters.selectedUpazila == "All" || nurse.upazila.equals(filters.selectedUpazila, ignoreCase = true))
+                    }
+                    .map { it.hospitalName }
+                    .filter { it.isNotBlank() }
+                    .distinct()
+                    .sorted()
+
                 val q = filters.searchQuery.trim().lowercase()
+                val qDigits = q.filter { it.isDigit() }
                 val filtered = approved.filter { nurse ->
                     val matchesQuery = q.isEmpty() ||
                         nurse.fullName.lowercase().contains(q) ||
                         nurse.hospitalName.lowercase().contains(q) ||
                         nurse.district.lowercase().contains(q) ||
+                        nurse.upazila.lowercase().contains(q) ||
                         nurse.division.lowercase().contains(q) ||
                         nurse.bnmcNumber.lowercase().contains(q) ||
                         nurse.specialty.lowercase().contains(q) ||
-                        nurse.phone.contains(q)
+                        nurse.phone.contains(q) ||
+                        (qDigits.isNotEmpty() && nurse.phone.filter { it.isDigit() }.contains(qDigits))
 
                     val matchesDivision = filters.selectedDivision == "All" ||
                         nurse.division.equals(filters.selectedDivision, ignoreCase = true)
+
+                    val matchesDistrict = filters.selectedDistrict == "All" ||
+                        nurse.district.equals(filters.selectedDistrict, ignoreCase = true)
+
+                    val matchesUpazila = filters.selectedUpazila == "All" ||
+                        nurse.upazila.equals(filters.selectedUpazila, ignoreCase = true)
+
+                    val matchesHospital = filters.selectedHospital == "All" ||
+                        nurse.hospitalName.equals(filters.selectedHospital, ignoreCase = true)
 
                     val matchesSpecialty = filters.selectedSpecialty == "All" ||
                         nurse.specialty.equals(filters.selectedSpecialty, ignoreCase = true)
@@ -265,12 +318,16 @@ class NursesViewModel(
                         nurse.availabilityEnum == AvailabilityStatus.EMERGENCY_AVAILABLE ||
                         nurse.availabilityEnum == AvailabilityStatus.ON_DUTY
 
-                    matchesQuery && matchesDivision && matchesSpecialty && matchesBlood && matchesEmergency
+                    matchesQuery && matchesDivision && matchesDistrict && matchesUpazila &&
+                        matchesHospital && matchesSpecialty && matchesBlood && matchesEmergency
                 }
                 DirectoryUiState(
                     isLoading = false,
                     totalVerifiedCount = approved.size,
                     filteredNurses = filtered,
+                    availableDistricts = districtsForDivision,
+                    availableUpazilas = upazilasForSelection,
+                    availableHospitals = hospitalsForSelection,
                     filters = filters
                 )
             }
@@ -300,7 +357,9 @@ class NursesViewModel(
                 nurse.fullName.lowercase().contains(q) ||
                 nurse.division.lowercase().contains(q) ||
                 nurse.district.lowercase().contains(q) ||
+                nurse.upazila.lowercase().contains(q) ||
                 nurse.hospitalName.lowercase().contains(q) ||
+                nurse.phone.contains(q) ||
                 nurse.bnmcNumber.lowercase().contains(q)
             val matchesStatus = statusFilter == null || nurse.approvalEnum == statusFilter
             matchesQuery && matchesStatus
@@ -378,7 +437,37 @@ class NursesViewModel(
     }
 
     fun selectDivisionFilter(division: String) {
-        _filters.update { it.copy(selectedDivision = division) }
+        _filters.update {
+            it.copy(
+                selectedDivision = division,
+                selectedDistrict = "All",
+                selectedUpazila = "All",
+                selectedHospital = "All"
+            )
+        }
+    }
+
+    fun selectDistrictFilter(district: String) {
+        _filters.update {
+            it.copy(
+                selectedDistrict = district,
+                selectedUpazila = "All",
+                selectedHospital = "All"
+            )
+        }
+    }
+
+    fun selectUpazilaFilter(upazila: String) {
+        _filters.update {
+            it.copy(
+                selectedUpazila = upazila,
+                selectedHospital = "All"
+            )
+        }
+    }
+
+    fun selectHospitalFilter(hospital: String) {
+        _filters.update { it.copy(selectedHospital = hospital) }
     }
 
     fun selectSpecialtyFilter(specialty: String) {

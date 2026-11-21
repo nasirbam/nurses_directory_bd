@@ -82,6 +82,7 @@ service cloud.firestore {
              data.specialty is string && data.specialty.size() >= 2 && data.specialty.size() <= 60 &&
              data.division is string && data.division.size() >= 2 && data.division.size() <= 40 &&
              data.district is string && data.district.size() >= 2 && data.district.size() <= 40 &&
+             (!('upazila' in data) || (data.upazila is string && data.upazila.size() <= 50)) &&
              data.hospitalName is string && data.hospitalName.size() >= 3 && data.hospitalName.size() <= 120 &&
              data.phone is string && data.phone.size() >= 11 && data.phone.size() <= 20 &&
              data.whatsapp is string && data.whatsapp.size() >= 11 && data.whatsapp.size() <= 20 &&
@@ -157,7 +158,7 @@ service cloud.firestore {
                        ]) &&
                        incoming().keys().hasOnly([
                          'submittedByUid', 'fullName', 'bnmcNumber', 'designation',
-                         'qualification', 'specialty', 'division', 'district',
+                         'qualification', 'specialty', 'division', 'district', 'upazila',
                          'hospitalName', 'phone', 'whatsapp', 'email',
                          'bloodGroup', 'availabilityStatus', 'experienceYears',
                          'bio', 'approvalStatus', 'rejectionReason',
@@ -192,7 +193,7 @@ service cloud.firestore {
                            existing().submittedByUid == request.auth.uid &&
                            existing().approvalStatus != 'REJECTED' &&
                            incoming().diff(existing()).affectedKeys().hasOnly([
-                             'availabilityStatus', 'phone', 'whatsapp', 'hospitalName', 'bio', 'updatedAt'
+                             'availabilityStatus', 'phone', 'whatsapp', 'upazila', 'hospitalName', 'bio', 'updatedAt'
                            ])
                          )
                        );

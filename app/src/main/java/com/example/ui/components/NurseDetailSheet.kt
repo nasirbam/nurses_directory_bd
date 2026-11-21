@@ -232,7 +232,12 @@ fun NurseDetailBottomSheet(
             Spacer(modifier = Modifier.height(14.dp))
 
             DetailRow(Icons.Filled.LocalHospital, "Workplace / Hospital", nurse.hospitalName)
-            DetailRow(Icons.Filled.LocationOn, "Location", "${nurse.district} District, ${nurse.division} Division")
+            val locationText = listOfNotNull(
+                nurse.upazila.takeIf { it.isNotBlank() },
+                nurse.district.takeIf { it.isNotBlank() },
+                nurse.division.takeIf { it.isNotBlank() }?.let { "$it Division" }
+            ).joinToString(", ")
+            DetailRow(Icons.Filled.LocationOn, "Location", locationText)
             DetailRow(Icons.Filled.MedicalServices, "Clinical Specialty", nurse.specialty)
             DetailRow(Icons.Filled.School, "Qualification", nurse.qualification)
             DetailRow(Icons.Filled.WorkHistory, "Experience", "${nurse.experienceYears} Years")
