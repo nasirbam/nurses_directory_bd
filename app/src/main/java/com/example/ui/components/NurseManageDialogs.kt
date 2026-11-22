@@ -2,10 +2,11 @@ package com.example.ui.components
 
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
+import androidx.compose.foundation.layout.FlowRow
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
@@ -19,6 +20,7 @@ import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.FilterChip
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -39,19 +41,26 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.EducationEntry
 import com.example.data.LiveNoticeEntity
+import com.example.data.NurseCategory
 import com.example.data.NurseEntity
 import com.example.data.SecurityUtils
 import com.example.ui.screens.FormDropdownField
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun EditNurseDialog(
     nurse: NurseEntity,
     onDismiss: () -> Unit,
     onSave: (updatedNurse: NurseEntity, onError: (String) -> Unit) -> Unit
 ) {
+    var selectedCategory by remember(nurse.id) { mutableStateOf(nurse.categoryEnum) }
     var fullName by remember(nurse.id) { mutableStateOf(nurse.fullName) }
+    var fatherName by remember(nurse.id) { mutableStateOf(nurse.fatherName) }
+    var motherName by remember(nurse.id) { mutableStateOf(nurse.motherName) }
     var bnmcNumber by remember(nurse.id) { mutableStateOf(nurse.bnmcNumber) }
+    var govtUid by remember(nurse.id) { mutableStateOf(nurse.govtUid) }
     var phone by remember(nurse.id) { mutableStateOf(nurse.phone) }
     var whatsapp by remember(nurse.id) { mutableStateOf(nurse.whatsapp.ifBlank { nurse.phone }) }
     var email by remember(nurse.id) { mutableStateOf(nurse.email) }
@@ -75,12 +84,17 @@ fun EditNurseDialog(
             }
         )
     }
+    var address by remember(nurse.id) { mutableStateOf(nurse.address) }
     var hospitalName by remember(nurse.id) { mutableStateOf(nurse.hospitalName) }
     var designation by remember(nurse.id) {
         mutableStateOf(nurse.designation.ifBlank { BangladeshData.designations.first() })
     }
-    var qualification by remember(nurse.id) {
-        mutableStateOf(nurse.qualification.ifBlank { BangladeshData.qualifications.first() })
+    var educations by remember(nurse.id) {
+        mutableStateOf(
+            nurse.effectiveEducations().ifEmpty {
+                listOf(EducationEntry(courseName = BangladeshData.courseNames.first()))
+            }
+        )
     }
     var specialty by remember(nurse.id) {
         mutableStateOf(nurse.specialty.ifBlank { BangladeshData.specialties.first() })
@@ -134,6 +148,24 @@ fun EditNurseDialog(
                     }
                 }
 
+                Text(
+                    text = "Service Category",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    NurseCategory.entries.forEach { cat ->
+                        FilterChip(
+                            selected = selectedCategory == cat,
+                            onClick = { selectedCategory = cat; errorText = null },
+                            label = { Text(cat.shortLabel) }
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = { fullName = it; errorText = null },
@@ -144,15 +176,47 @@ fun EditNurseDialog(
                         .testTag("edit_nurse_name")
                 )
 
+                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedTextField(
+                        value = fatherName,
+                        onValueChange = { fatherName = it.take(80) },
+                        label = { Text("Father's Name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                    OutlinedTextField(
+                        value = motherName,
+                        onValueChange = { motherName = it.take(80) },
+                        label = { Text("Mother's Name") },
+                        singleLine = true,
+                        modifier = Modifier.weight(1f)
+                    )
+                }
+
                 OutlinedTextField(
                     value = bnmcNumber,
                     onValueChange = { bnmcNumber = it; errorText = null },
-                    label = { Text("BNMC Number *") },
+                    label = {
+                        Text(
+                            if (selectedCategory == NurseCategory.STUDENT) "Student Registration No. *"
+                            else "BNMC Registration No. *"
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
                         .testTag("edit_nurse_bnmc")
                 )
+
+                if (selectedCategory != NurseCategory.STUDENT) {
+                    OutlinedTextField(
+                        value = govtUid,
+                        onValueChange = { govtUid = it.take(40) },
+                        label = { Text("Govt. UID (Optional for Job Holders)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
 
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     OutlinedTextField(
@@ -230,9 +294,30 @@ fun EditNurseDialog(
                 )
 
                 OutlinedTextField(
+                    value = address,
+                    onValueChange = { address = it.take(200); errorText = null },
+                    label = {
+                        Text(
+                            if (selectedCategory == NurseCategory.NON_GOVT) "Present Address (ঠিকানা) *"
+                            else "Present Address (Optional)"
+                        )
+                    },
+                    singleLine = true,
+                    modifier = Modifier.fillMaxWidth()
+                )
+
+                OutlinedTextField(
                     value = hospitalName,
                     onValueChange = { hospitalName = it; errorText = null },
-                    label = { Text("Hospital / Workplace *") },
+                    label = {
+                        Text(
+                            when (selectedCategory) {
+                                NurseCategory.GOVT -> "Govt. Hospital / Workplace *"
+                                NurseCategory.NON_GOVT -> "Working Place / Clinic (Optional)"
+                                NurseCategory.STUDENT -> "Educational Institute *"
+                            }
+                        )
+                    },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -247,12 +332,9 @@ fun EditNurseDialog(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                FormDropdownField(
-                    label = "Qualification",
-                    selected = qualification,
-                    options = (BangladeshData.qualifications + qualification).distinct(),
-                    onSelect = { qualification = it },
-                    modifier = Modifier.fillMaxWidth()
+                EducationInputSection(
+                    educations = educations,
+                    onEducationsChange = { educations = it }
                 )
 
                 FormDropdownField(
@@ -301,33 +383,52 @@ fun EditNurseDialog(
                     val cleanWhatsapp = whatsapp.replace(Regex("[\\s\\-]"), "").ifBlank { cleanPhone }
                     val cleanEmail = email.trim()
                     val cleanHospital = hospitalName.trim()
+                    val cleanAddress = address.trim()
+                    val validEducations = educations.filter { it.courseName.isNotBlank() }
 
                     when {
                         cleanName.length !in 3..80 -> errorText = "Name must be 3–80 characters."
-                        cleanBnmc.length !in 4..30 -> errorText = "Enter valid BNMC number."
+                        cleanBnmc.length !in 4..30 -> errorText = "Enter valid registration number."
                         !SecurityUtils.isValidBangladeshPhone(cleanPhone) -> errorText = "Enter valid BD mobile (01XXXXXXXXX)."
                         !SecurityUtils.isValidBangladeshPhone(cleanWhatsapp) -> errorText = "Enter valid BD WhatsApp number."
                         cleanEmail.isNotEmpty() && !SecurityUtils.isValidEmail(cleanEmail) -> errorText = "Enter valid email."
-                        cleanHospital.length !in 3..120 -> errorText = "Hospital name must be 3–120 characters."
+                        selectedCategory == NurseCategory.GOVT && cleanHospital.length !in 3..120 ->
+                            errorText = "Govt. hospital name must be 3–120 characters."
+                        selectedCategory == NurseCategory.STUDENT && cleanHospital.length !in 3..120 ->
+                            errorText = "Educational institute name must be 3–120 characters."
+                        selectedCategory == NurseCategory.NON_GOVT && cleanAddress.length < 3 && cleanHospital.length < 3 ->
+                            errorText = "Present address (thikana) is required for Non-Govt. nurses."
+                        validEducations.isEmpty() ->
+                            errorText = "Select at least one educational course."
                         else -> {
                             isSaving = true
-                            val updated = nurse.copy(
+                            val draft = nurse.copy(
+                                nurseCategory = selectedCategory.name,
                                 fullName = cleanName,
+                                fatherName = fatherName.trim(),
+                                motherName = motherName.trim(),
                                 bnmcNumber = cleanBnmc,
+                                govtUid = govtUid.trim(),
                                 phone = cleanPhone,
                                 whatsapp = cleanWhatsapp,
                                 email = cleanEmail,
                                 division = selectedDivision,
                                 district = selectedDistrict,
                                 upazila = selectedUpazila,
+                                address = cleanAddress,
                                 hospitalName = cleanHospital,
                                 designation = designation,
-                                qualification = qualification,
+                                educations = validEducations,
                                 specialty = specialty,
                                 bloodGroup = bloodGroup,
                                 availabilityStatus = availability.name,
                                 experienceYears = (experienceYearsText.toIntOrNull() ?: nurse.experienceYears).coerceIn(0, 60),
                                 bio = bio.trim()
+                            )
+                            val updated = draft.copy(
+                                qualification = draft.educationSummaryText()
+                                    .ifBlank { validEducations.first().courseName }
+                                    .take(200)
                             )
                             onSave(updated) { msg ->
                                 isSaving = false
@@ -350,11 +451,15 @@ fun EditNurseDialog(
     )
 }
 
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun RequestTransferDialog(
     nurse: NurseEntity,
     onDismiss: () -> Unit,
     onSubmit: (
+        newCategory: NurseCategory,
+        newGovtUid: String,
+        newDesignation: String,
         newDivision: String,
         newDistrict: String,
         newUpazila: String,
@@ -363,6 +468,19 @@ fun RequestTransferDialog(
         onError: (String) -> Unit
     ) -> Unit
 ) {
+    var targetCategory by remember(nurse.id) {
+        mutableStateOf(
+            if (nurse.categoryEnum == NurseCategory.NON_GOVT) NurseCategory.GOVT
+            else nurse.categoryEnum
+        )
+    }
+    var newGovtUid by remember(nurse.id) { mutableStateOf(nurse.govtUid) }
+    var newDesignation by remember(nurse.id) {
+        mutableStateOf(
+            if (nurse.categoryEnum == NurseCategory.NON_GOVT) "Senior Staff Nurse"
+            else nurse.designation.ifBlank { BangladeshData.designations.first() }
+        )
+    }
     var selectedDivision by remember(nurse.id) {
         mutableStateOf(
             if (nurse.division in BangladeshData.divisions) nurse.division
@@ -398,7 +516,15 @@ fun RequestTransferDialog(
     AlertDialog(
         onDismissRequest = { if (!isSubmitting) onDismiss() },
         icon = { Icon(Icons.Filled.SwapHoriz, contentDescription = null) },
-        title = { Text("Request Hospital Transfer") },
+        title = {
+            Text(
+                if (nurse.categoryEnum == NurseCategory.NON_GOVT) {
+                    "Govt. Joining / Workplace Transfer"
+                } else {
+                    "Request Hospital Transfer"
+                }
+            )
+        },
         text = {
             Column(
                 modifier = Modifier
@@ -416,13 +542,13 @@ fun RequestTransferDialog(
                         verticalArrangement = Arrangement.spacedBy(2.dp)
                     ) {
                         Text(
-                            text = "Current Workplace (${nurse.fullName})",
+                            text = "Current Profile (${nurse.fullName} • ${nurse.categoryEnum.shortLabel})",
                             style = MaterialTheme.typography.labelMedium,
                             color = MaterialTheme.colorScheme.primary,
                             fontWeight = FontWeight.Bold
                         )
                         Text(
-                            text = nurse.hospitalName,
+                            text = nurse.hospitalName.ifBlank { "Workplace not set • ${nurse.address}" },
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -452,6 +578,50 @@ fun RequestTransferDialog(
                         )
                     }
                 }
+
+                Text(
+                    text = "Target Category (নতুন ক্যাটাগরি)",
+                    style = MaterialTheme.typography.labelLarge,
+                    fontWeight = FontWeight.SemiBold
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    listOf(NurseCategory.GOVT, NurseCategory.NON_GOVT).forEach { cat ->
+                        FilterChip(
+                            selected = targetCategory == cat,
+                            onClick = { targetCategory = cat; errorText = null },
+                            label = {
+                                Text(
+                                    if (cat == NurseCategory.GOVT) "Govt. Service (সরকারি)"
+                                    else "Non-Govt. (বেসরকারি)"
+                                )
+                            }
+                        )
+                    }
+                }
+
+                if (targetCategory == NurseCategory.GOVT) {
+                    OutlinedTextField(
+                        value = newGovtUid,
+                        onValueChange = { newGovtUid = it.take(40) },
+                        label = { Text("Govt. UID (If Assigned)") },
+                        placeholder = { Text("e.g., GOVT-UID-10492") },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("transfer_govt_uid")
+                    )
+                }
+
+                FormDropdownField(
+                    label = "New Designation",
+                    selected = newDesignation,
+                    options = (BangladeshData.designations + newDesignation).distinct(),
+                    onSelect = { newDesignation = it },
+                    modifier = Modifier.fillMaxWidth()
+                )
 
                 FormDropdownField(
                     label = "New Division *",
@@ -488,7 +658,15 @@ fun RequestTransferDialog(
                 OutlinedTextField(
                     value = newHospitalName,
                     onValueChange = { newHospitalName = it; errorText = null },
-                    label = { Text("New Hospital / Workplace Name *") },
+                    label = {
+                        Text(
+                            if (targetCategory == NurseCategory.GOVT) {
+                                "New Govt. Working Place / Hospital *"
+                            } else {
+                                "New Working Place / Hospital Name *"
+                            }
+                        )
+                    },
                     placeholder = { Text("e.g., Chittagong Medical College Hospital") },
                     leadingIcon = { Icon(Icons.Filled.LocalHospital, contentDescription = null) },
                     singleLine = true,
@@ -500,8 +678,8 @@ fun RequestTransferDialog(
                 OutlinedTextField(
                     value = transferNote,
                     onValueChange = { transferNote = it.take(250) },
-                    label = { Text("Transfer Order / Note (Optional)") },
-                    placeholder = { Text("e.g., Transferred via DGHS memo #...") },
+                    label = { Text("Transfer / Joining Order Note (Optional)") },
+                    placeholder = { Text("e.g., Joined Govt. service / DGHS memo #...") },
                     minLines = 2,
                     maxLines = 3,
                     modifier = Modifier
@@ -510,7 +688,7 @@ fun RequestTransferDialog(
                 )
 
                 Text(
-                    text = "অ্যাডমিন অনুমোদন করলে আপনার প্রোফাইল স্বয়ংক্রিয়ভাবে নতুন হাসপাতালে আপডেট হয়ে যাবে।",
+                    text = "অ্যাডমিন অনুমোদন করলে আপনার ক্যাটাগরি ও নতুন কর্মস্থল স্বয়ংক্রিয়ভাবে আপডেট হয়ে যাবে।",
                     style = MaterialTheme.typography.labelSmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -521,11 +699,18 @@ fun RequestTransferDialog(
                 onClick = {
                     val cleanHospital = newHospitalName.trim()
                     if (cleanHospital.length !in 3..120) {
-                        errorText = "Enter new hospital name (3–120 characters)."
+                        errorText = if (targetCategory == NurseCategory.GOVT) {
+                            "Govt. working place / hospital name is mandatory (3–120 characters)."
+                        } else {
+                            "Enter new workplace / hospital name (3–120 characters)."
+                        }
                         return@Button
                     }
                     isSubmitting = true
                     onSubmit(
+                        targetCategory,
+                        newGovtUid.trim(),
+                        newDesignation,
                         selectedDivision,
                         selectedDistrict,
                         selectedUpazila,

@@ -20,6 +20,10 @@ data class TransferRequestEntity(
     val nurseName: String = "",
     val bnmcNumber: String = "",
     val requestedByUid: String = "",
+    val currentCategory: String = NurseCategory.GOVT.name,
+    val newCategory: String = NurseCategory.GOVT.name,
+    val newGovtUid: String = "",
+    val newDesignation: String = "",
     val currentHospitalName: String = "",
     val currentDivision: String = "",
     val currentDistrict: String = "",
@@ -39,6 +43,14 @@ data class TransferRequestEntity(
     val statusEnum: TransferStatus
         get() = TransferStatus.entries.firstOrNull { it.name == status }
             ?: TransferStatus.PENDING
+
+    val currentCategoryEnum: NurseCategory
+        get() = NurseCategory.entries.firstOrNull { it.name == currentCategory }
+            ?: NurseCategory.GOVT
+
+    val newCategoryEnum: NurseCategory
+        get() = NurseCategory.entries.firstOrNull { it.name == newCategory }
+            ?: NurseCategory.GOVT
 }
 
 @Keep

@@ -17,7 +17,7 @@
         "role": {
           "type": "string",
           "enum": ["SUPER_ADMIN", "MODERATOR"],
-          "description": "Administrative privilege level."
+          "description": "Administrative privilege level (SUPER_ADMIN or Divisional MODERATOR)."
         },
         "assignedDivision": {
           "type": "string",
@@ -50,7 +50,7 @@
     },
     "Nurse": {
       "title": "Nurse",
-      "description": "Registered Bangladesh nurse directory profile and approval workflow record.",
+      "description": "Registered Bangladesh nurse/midwife/student directory profile and approval workflow record.",
       "type": "object",
       "properties": {
         "submittedByUid": {
@@ -61,17 +61,47 @@
           "type": "string",
           "description": "Nurse full name (3 to 80 characters)."
         },
+        "fatherName": {
+          "type": "string",
+          "description": "Father's name (0 to 80 characters)."
+        },
+        "motherName": {
+          "type": "string",
+          "description": "Mother's name (0 to 80 characters)."
+        },
+        "nurseCategory": {
+          "type": "string",
+          "enum": ["GOVT", "NON_GOVT", "STUDENT"],
+          "description": "Employment/academic category: Govt. Nurse/Midwife, Non-Govt. Nurse/Midwife, or Student Nurse/Midwife."
+        },
         "bnmcNumber": {
           "type": "string",
-          "description": "Bangladesh Nursing & Midwifery Council registration number (4 to 30 characters)."
+          "description": "BNMC Registration No. (or Student Registration No. for Student Nurse/Midwife) (4 to 30 characters)."
+        },
+        "govtUid": {
+          "type": "string",
+          "description": "Government service UID / Employee ID for employed government nurses (0 to 40 characters)."
         },
         "designation": {
           "type": "string",
-          "description": "Nursing role title (2 to 60 characters)."
+          "description": "Nursing role title (e.g., Senior Staff Nurse, Midwife, Student Nurse) (2 to 60 characters)."
         },
         "qualification": {
           "type": "string",
-          "description": "Academic nursing qualification (2 to 80 characters)."
+          "description": "Formatted educational summary (2 to 200 characters)."
+        },
+        "educations": {
+          "type": "array",
+          "description": "Structured list of educational courses (courseName, major, university, passedYear).",
+          "items": {
+            "type": "object",
+            "properties": {
+              "courseName": { "type": "string" },
+              "major": { "type": "string" },
+              "university": { "type": "string" },
+              "passedYear": { "type": "string" }
+            }
+          }
         },
         "specialty": {
           "type": "string",
@@ -89,9 +119,13 @@
           "type": "string",
           "description": "Bangladesh upazila or thana name (0 to 50 characters)."
         },
+        "address": {
+          "type": "string",
+          "description": "Present residential address (mandatory for Non-Govt when workplace is optional; 0 to 200 characters)."
+        },
         "hospitalName": {
           "type": "string",
-          "description": "Hospital, clinic, or health facility name (3 to 120 characters)."
+          "description": "Hospital/workplace or Educational Institute (mandatory for Govt & Student; optional for Non-Govt; 0 to 120 characters)."
         },
         "phone": {
           "type": "string",
@@ -171,96 +205,47 @@
         "bio",
         "approvalStatus",
         "rejectionReason",
-        "reviewedAt",
         "createdAt",
         "updatedAt"
       ]
     },
     "TransferRequest": {
       "title": "TransferRequest",
-      "description": "Nurse hospital transfer request submitted by the nurse owner for admin approval.",
+      "description": "Nurse hospital transfer or Non-Govt to Govt service transfer request submitted by the nurse owner for admin approval.",
       "type": "object",
       "properties": {
-        "nurseId": {
+        "nurseId": { "type": "string" },
+        "nurseName": { "type": "string" },
+        "bnmcNumber": { "type": "string" },
+        "requestedByUid": { "type": "string" },
+        "currentCategory": {
           "type": "string",
-          "description": "Target nurse document ID in /nurses."
+          "enum": ["GOVT", "NON_GOVT", "STUDENT"]
         },
-        "nurseName": {
+        "newCategory": {
           "type": "string",
-          "description": "Nurse full name (3 to 80 characters)."
+          "enum": ["GOVT", "NON_GOVT", "STUDENT"]
         },
-        "bnmcNumber": {
-          "type": "string",
-          "description": "BNMC registration number (4 to 30 characters)."
-        },
-        "requestedByUid": {
-          "type": "string",
-          "description": "Firebase Auth UID of the requesting nurse."
-        },
-        "currentHospitalName": {
-          "type": "string",
-          "description": "Current workplace/hospital name."
-        },
-        "currentDivision": {
-          "type": "string",
-          "description": "Current Bangladesh division."
-        },
-        "currentDistrict": {
-          "type": "string",
-          "description": "Current Bangladesh district."
-        },
-        "currentUpazila": {
-          "type": "string",
-          "description": "Current Bangladesh upazila."
-        },
-        "newHospitalName": {
-          "type": "string",
-          "description": "Requested destination hospital/workplace name (3 to 120 characters)."
-        },
-        "newDivision": {
-          "type": "string",
-          "description": "Requested destination Bangladesh division."
-        },
-        "newDistrict": {
-          "type": "string",
-          "description": "Requested destination Bangladesh district."
-        },
-        "newUpazila": {
-          "type": "string",
-          "description": "Requested destination Bangladesh upazila."
-        },
-        "transferNote": {
-          "type": "string",
-          "description": "Optional transfer order reference or reason (0 to 250 characters)."
-        },
+        "newGovtUid": { "type": "string" },
+        "newDesignation": { "type": "string" },
+        "currentHospitalName": { "type": "string" },
+        "currentDivision": { "type": "string" },
+        "currentDistrict": { "type": "string" },
+        "currentUpazila": { "type": "string" },
+        "newHospitalName": { "type": "string" },
+        "newDivision": { "type": "string" },
+        "newDistrict": { "type": "string" },
+        "newUpazila": { "type": "string" },
+        "transferNote": { "type": "string" },
         "status": {
           "type": "string",
-          "enum": ["PENDING", "APPROVED", "REJECTED"],
-          "description": "Admin moderation status; new requests always start as PENDING."
+          "enum": ["PENDING", "APPROVED", "REJECTED"]
         },
-        "rejectionReason": {
-          "type": "string",
-          "description": "Admin rejection note if rejected (0 to 250 characters)."
-        },
-        "reviewedBy": {
-          "type": "string",
-          "description": "Email of reviewing administrator."
-        },
-        "reviewedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp of admin review."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp when submitted."
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp when updated."
-        }
+        "rejectionReason": { "type": "string" },
+        "reviewedBy": { "type": "string" },
+        "reviewedAt": { "type": "string", "format": "date-time" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": [
         "nurseId",
@@ -285,59 +270,31 @@
       "description": "Real-time directory broadcast banner updated by admins without APK re-downloads.",
       "type": "object",
       "properties": {
-        "title": {
-          "type": "string",
-          "description": "Short notice headline (0 to 100 characters)."
-        },
-        "message": {
-          "type": "string",
-          "description": "Live notice message body (0 to 400 characters)."
-        },
-        "active": {
-          "type": "boolean",
-          "description": "Whether the live notice banner is currently visible."
-        },
-        "updatedBy": {
-          "type": "string",
-          "description": "Email of the administrator who last updated the notice."
-        },
-        "createdAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp of creation."
-        },
-        "updatedAt": {
-          "type": "string",
-          "format": "date-time",
-          "description": "Server timestamp of last modification."
-        }
+        "title": { "type": "string" },
+        "message": { "type": "string" },
+        "active": { "type": "boolean" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "message", "active", "updatedBy", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
     "/admins/{adminEmail}": {
-      "schema": {
-        "$ref": "#/entities/Admin"
-      },
+      "schema": { "$ref": "#/entities/Admin" },
       "description": "Role-based access registry of administrators keyed by verified lowercase Google email."
     },
     "/nurses/{nurseId}": {
-      "schema": {
-        "$ref": "#/entities/Nurse"
-      },
-      "description": "Registered nurses directory across Bangladesh with approval workflow."
+      "schema": { "$ref": "#/entities/Nurse" },
+      "description": "Registered nurses, midwives, and student nurses directory across Bangladesh with approval workflow."
     },
     "/transfer_requests/{requestId}": {
-      "schema": {
-        "$ref": "#/entities/TransferRequest"
-      },
-      "description": "Hospital transfer requests initiated by approved nurses and approved/rejected by admins."
+      "schema": { "$ref": "#/entities/TransferRequest" },
+      "description": "Hospital transfer and Non-Govt to Govt transfer requests initiated by approved nurses and approved/rejected by admins."
     },
     "/app_config/{configId}": {
-      "schema": {
-        "$ref": "#/entities/LiveNotice"
-      },
+      "schema": { "$ref": "#/entities/LiveNotice" },
       "description": "Live remote configuration and admin announcement notice synced across all app installs."
     }
   }

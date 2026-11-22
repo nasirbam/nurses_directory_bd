@@ -31,9 +31,11 @@ import androidx.compose.material.icons.filled.HowToReg
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -81,6 +83,7 @@ import com.example.ui.AdminSessionState
 import com.example.ui.AnalyticsSummary
 import com.example.ui.components.ApprovalFunnelCard
 import com.example.ui.components.DivisionBarChartCard
+import com.example.ui.components.PrintReportDialog
 import com.example.ui.components.PublishLiveNoticeDialog
 import com.example.ui.components.SpecialtyDonutChartCard
 import com.example.ui.theme.StatusApproved
@@ -95,6 +98,8 @@ fun AdminScreen(
     allNurses: List<NurseEntity>,
     transferRequests: List<TransferRequestEntity> = emptyList(),
     liveNotice: LiveNoticeEntity? = null,
+    hasOwnNurseProfile: Boolean = true,
+    onRegisterSelfAsNurse: () -> Unit = {},
     onSignOutAndSwitch: () -> Unit,
     onApproveNurse: (NurseEntity, (Result<Unit>) -> Unit) -> Unit,
     onRejectNurse: (NurseEntity, String, (Result<Unit>) -> Unit) -> Unit,
@@ -128,6 +133,7 @@ fun AdminScreen(
     var transferToReject by remember { mutableStateOf<TransferRequestEntity?>(null) }
     var showAddAdminDialog by remember { mutableStateOf(false) }
     var showLiveNoticeDialog by remember { mutableStateOf(false) }
+    var showPrintReportDialog by remember { mutableStateOf(false) }
     var adminToRemove by remember { mutableStateOf<AdminEntity?>(null) }
 
     val pendingTransfersCount = remember(transferRequests) {
@@ -247,6 +253,10 @@ fun AdminScreen(
                 pendingNurses = allNurses.filter { it.approvalEnum == ApprovalStatus.PENDING },
                 pendingTransfersCount = pendingTransfersCount,
                 liveNotice = liveNotice,
+                divisionScope = session.effectiveDivisionScope,
+                hasOwnNurseProfile = hasOwnNurseProfile,
+                onRegisterSelfAsNurse = onRegisterSelfAsNurse,
+                onOpenPrintReport = { showPrintReportDialog = true },
                 onApprove = { nurse ->
                     onApproveNurse(nurse) { res ->
                         res.onSuccess { onShowMessage("${nurse.fullName} approved & published!") }
@@ -463,6 +473,16 @@ fun AdminScreen(
         )
     }
 
+    if (showPrintReportDialog) {
+        PrintReportDialog(
+            activeAdmin = activeAdmin,
+            allNurses = allNurses,
+            onDismiss = { showPrintReportDialog = false },
+            onPrintStarted = onShowMessage,
+            onPrintError = onShowMessage
+        )
+    }
+
     // Remove Admin Confirmation
     adminToRemove?.let { target ->
         AlertDialog(
@@ -502,6 +522,10 @@ fun AdminDashboardScreen(
     pendingNurses: List<NurseEntity>,
     pendingTransfersCount: Int = 0,
     liveNotice: LiveNoticeEntity? = null,
+    divisionScope: String? = null,
+    hasOwnNurseProfile: Boolean = true,
+    onRegisterSelfAsNurse: () -> Unit = {},
+    onOpenPrintReport: () -> Unit = {},
     onApprove: (NurseEntity) -> Unit,
     onRequestDelete: (NurseEntity) -> Unit,
     onOpenApprovals: () -> Unit,
@@ -616,6 +640,98 @@ fun AdminDashboardScreen(
                         Icon(Icons.Filled.Campaign, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Broadcast")
+                    }
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.72f)
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Print / Export Nurse Data (PDF)",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        )
+                        Text(
+                            text = if (divisionScope != null) {
+                                "Divisional Admin Scope: $divisionScope Division Only (কলাম ফিল্টার করে প্রিন্ট)"
+                            } else {
+                                "ফিল্টার ও কলাম টিক দিয়ে সকল নার্সের তথ্য প্রিন্ট / PDF করুন"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    Button(
+                        onClick = onOpenPrintReport,
+                        modifier = Modifier.testTag("admin_open_print_report_button")
+                    ) {
+                        Icon(Icons.Filled.Print, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Print / PDF")
+                    }
+                }
+            }
+        }
+
+        if (!hasOwnNurseProfile) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                    )
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(14.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Join Nurse Directory (সাধারণ নার্স প্রোফাইল)",
+                                style = MaterialTheme.typography.titleSmall,
+                                fontWeight = FontWeight.Bold,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer
+                            )
+                            Text(
+                                text = "অ্যাডমিন হলেও আপনি সাধারণ নার্স হিসেবে ডিরেক্টরিতে আপনার তথ্য যুক্ত করতে পারেন",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis
+                            )
+                        }
+                        Spacer(Modifier.width(10.dp))
+                        FilledTonalButton(
+                            onClick = onRegisterSelfAsNurse,
+                            modifier = Modifier.testTag("admin_register_self_nurse_button")
+                        ) {
+                            Icon(Icons.Filled.HowToReg, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Register")
+                        }
                     }
                 }
             }
@@ -930,11 +1046,31 @@ private fun ApprovalsQueueTab(
                                     style = MaterialTheme.typography.titleMedium,
                                     fontWeight = FontWeight.Bold
                                 )
-                                Text(
-                                    text = "${nurse.designation} • ${nurse.bnmcNumber}",
-                                    style = MaterialTheme.typography.bodySmall,
-                                    color = MaterialTheme.colorScheme.primary
-                                )
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                                ) {
+                                    Text(
+                                        text = "${nurse.designation} • ${nurse.registrationNumberLabel}: ${nurse.bnmcNumber}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        modifier = Modifier.weight(1f, fill = false)
+                                    )
+                                    if (nurse.approvalEnum == ApprovalStatus.APPROVED) {
+                                        Icon(
+                                            imageVector = Icons.Filled.Verified,
+                                            contentDescription = "Verified",
+                                            tint = StatusApproved,
+                                            modifier = Modifier.size(14.dp)
+                                        )
+                                        Text(
+                                            text = "Verified",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = StatusApproved
+                                        )
+                                    }
+                                }
                             }
                             Surface(
                                 shape = RoundedCornerShape(8.dp),
@@ -963,12 +1099,13 @@ private fun ApprovalsQueueTab(
                             nurse.district.takeIf { it.isNotBlank() },
                             nurse.division.takeIf { it.isNotBlank() }
                         ).joinToString(", ")
+                        val placeText = nurse.hospitalName.ifBlank { nurse.address.ifBlank { "Non-Govt." } }
                         Text(
-                            text = "${nurse.hospitalName} ($loc)",
+                            text = "${nurse.categoryEnum.shortLabel} • $placeText ($loc)",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
-                            text = "${nurse.specialty} • ${nurse.qualification} • Blood: ${nurse.bloodGroup} • ${nurse.phone}",
+                            text = "${nurse.specialty} • ${nurse.educationSummaryText().ifBlank { nurse.qualification }} • Blood: ${nurse.bloodGroup} • ${nurse.phone}",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1164,7 +1301,14 @@ private fun TransfersQueueTab(
                         }
 
                         Text(
-                            text = "From: ${req.currentHospitalName} (${req.currentUpazila}, ${req.currentDistrict})",
+                            text = "Category: ${req.currentCategoryEnum.shortLabel} ➔ ${req.newCategoryEnum.shortLabel}" +
+                                (req.newGovtUid.takeIf { it.isNotBlank() }?.let { " • UID: $it" } ?: ""),
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.primary,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        Text(
+                            text = "From: ${req.currentHospitalName.ifBlank { "Not specified" }} (${req.currentUpazila}, ${req.currentDistrict})",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -1173,6 +1317,13 @@ private fun TransfersQueueTab(
                             style = MaterialTheme.typography.bodyMedium,
                             fontWeight = FontWeight.SemiBold
                         )
+                        if (req.newDesignation.isNotBlank()) {
+                            Text(
+                                text = "Designation: ${req.newDesignation}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
                         if (req.transferNote.isNotBlank()) {
                             Text(
                                 text = "Note: ${req.transferNote}",

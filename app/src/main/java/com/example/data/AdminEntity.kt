@@ -26,4 +26,12 @@ data class AdminEntity(
     val roleEnum: AdminRole
         get() = AdminRole.entries.firstOrNull { it.name == role }
             ?: AdminRole.MODERATOR
+
+    val isDivisionRestricted: Boolean
+        get() = roleEnum != AdminRole.SUPER_ADMIN &&
+            assignedDivision.isNotBlank() &&
+            !assignedDivision.equals("All Bangladesh", ignoreCase = true)
+
+    val effectiveDivisionScope: String?
+        get() = if (isDivisionRestricted) assignedDivision.trim() else null
 }

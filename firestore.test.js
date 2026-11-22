@@ -511,3 +511,139 @@ test("Live remote notice: signed-in users can read app_config/live_notice; only 
 
   await assertSucceeds(aliceDb.collection("app_config").doc("live_notice").get());
 });
+
+test("Categories, parent names, multi-degree educations, Non-Govt optional workplace, and Non-Govt to Govt transfer", async () => {
+  const aliceDb = testEnv
+    .authenticatedContext(ALICE_UID, { email: ALICE_EMAIL, email_verified: true })
+    .firestore();
+  const adminDb = testEnv
+    .authenticatedContext(BOOTSTRAP_UID, { email: BOOTSTRAP_EMAIL, email_verified: true })
+    .firestore();
+
+  // Non-Govt nurse with blank hospitalName succeeds when address is provided
+  await assertSucceeds(
+    aliceDb.collection("nurses").doc("non_govt_1").set(
+      validNurseCreatePayload(ALICE_UID, {
+        fatherName: "Md. Abdul Karim",
+        motherName: "Begum Rokeya",
+        nurseCategory: "NON_GOVT",
+        govtUid: "",
+        hospitalName: "",
+        address: "House 14, Road 6, Mirpur-10, Dhaka",
+        educations: [
+          {
+            courseName: "BSc in Nursing (Basic)",
+            major: "Medical-Surgical",
+            university: "University of Dhaka",
+            passedYear: "2022",
+          },
+          {
+            courseName: "MSN",
+            major: "Critical Care",
+            university: "BSMMU",
+            passedYear: "2024",
+          },
+        ],
+        qualification: "BSc in Nursing (Basic) — Medical-Surgical (University of Dhaka, 2022)",
+      })
+    )
+  );
+
+  // Non-Govt nurse with BOTH blank hospitalName and blank address fails
+  await assertFails(
+    aliceDb.collection("nurses").doc("non_govt_invalid").set(
+      validNurseCreatePayload(ALICE_UID, {
+        nurseCategory: "NON_GOVT",
+        hospitalName: "",
+        address: "",
+      })
+    )
+  );
+
+  // Student nurse with blank educational institute (hospitalName) fails
+  await assertFails(
+    aliceDb.collection("nurses").doc("student_invalid").set(
+      validNurseCreatePayload(ALICE_UID, {
+        nurseCategory: "STUDENT",
+        designation: "Student Nurse",
+        hospitalName: "",
+        address: "Mirpur, Dhaka",
+      })
+    )
+  );
+
+  // Student nurse with Educational Institute & Student Registration succeeds
+  await assertSucceeds(
+    aliceDb.collection("nurses").doc("student_valid").set(
+      validNurseCreatePayload(ALICE_UID, {
+        nurseCategory: "STUDENT",
+        designation: "Student Nurse",
+        bnmcNumber: "STU-2025-881",
+        hospitalName: "Dhaka Nursing College",
+        address: "Bakshibazar, Dhaka",
+      })
+    )
+  );
+
+  // Approve non_govt_1 as Admin
+  await assertSucceeds(
+    adminDb.collection("nurses").doc("non_govt_1").update({
+      approvalStatus: "APPROVED",
+      reviewedBy: BOOTSTRAP_EMAIL,
+      reviewedAt: new Date(Date.now() - 1000),
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Non-Govt nurse applies for Non-Govt -> Govt transfer with mandatory newHospitalName & Govt UID
+  const now = new Date(Date.now() - 1000);
+  await assertSucceeds(
+    aliceDb.collection("transfer_requests").doc("tr_govt_join").set({
+      nurseId: "non_govt_1",
+      nurseName: "Nusrat Jahan Mim",
+      bnmcNumber: "BNMC-48920",
+      requestedByUid: ALICE_UID,
+      currentCategory: "NON_GOVT",
+      newCategory: "GOVT",
+      newGovtUid: "DGHS-994120",
+      newDesignation: "Senior Staff Nurse",
+      currentHospitalName: "",
+      currentDivision: "Dhaka",
+      currentDistrict: "Dhaka",
+      currentUpazila: "Mirpur",
+      newHospitalName: "Dhaka Medical College Hospital",
+      newDivision: "Dhaka",
+      newDistrict: "Dhaka",
+      newUpazila: "Shahbagh",
+      transferNote: "Joined Govt service via PSC batch",
+      status: "PENDING",
+      rejectionReason: "",
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  // Admin atomically approves Non-Govt -> Govt transfer
+  const batch = adminDb.batch();
+  batch.update(adminDb.collection("nurses").doc("non_govt_1"), {
+    nurseCategory: "GOVT",
+    govtUid: "DGHS-994120",
+    designation: "Senior Staff Nurse",
+    division: "Dhaka",
+    district: "Dhaka",
+    upazila: "Shahbagh",
+    hospitalName: "Dhaka Medical College Hospital",
+    reviewedBy: BOOTSTRAP_EMAIL,
+    reviewedAt: new Date(Date.now() - 500),
+    updatedAt: new Date(Date.now() - 500),
+  });
+  batch.update(adminDb.collection("transfer_requests").doc("tr_govt_join"), {
+    status: "APPROVED",
+    rejectionReason: "",
+    reviewedBy: BOOTSTRAP_EMAIL,
+    reviewedAt: new Date(Date.now() - 500),
+    updatedAt: new Date(Date.now() - 500),
+  });
+  await assertSucceeds(batch.commit());
+});
+

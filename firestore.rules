@@ -73,17 +73,36 @@ service cloud.firestore {
              data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
 
+    function hasValidHospitalOrAddress(data) {
+      return data.hospitalName is string &&
+             data.hospitalName.size() <= 120 &&
+             (
+               (!('nurseCategory' in data) || data.nurseCategory != 'NON_GOVT')
+                 ? data.hospitalName.size() >= 3
+                 : (
+                     data.hospitalName.size() >= 3 ||
+                     ('address' in data && data.address is string && data.address.size() >= 3)
+                   )
+             );
+    }
+
     function isValidNurse(data) {
       return data.submittedByUid is string && data.submittedByUid.size() >= 1 && data.submittedByUid.size() <= 128 &&
              data.fullName is string && data.fullName.size() >= 3 && data.fullName.size() <= 80 &&
+             (!('fatherName' in data) || (data.fatherName is string && data.fatherName.size() <= 80)) &&
+             (!('motherName' in data) || (data.motherName is string && data.motherName.size() <= 80)) &&
+             (!('nurseCategory' in data) || data.nurseCategory in ['GOVT', 'NON_GOVT', 'STUDENT']) &&
              data.bnmcNumber is string && data.bnmcNumber.size() >= 4 && data.bnmcNumber.size() <= 30 &&
+             (!('govtUid' in data) || (data.govtUid is string && data.govtUid.size() <= 40)) &&
              data.designation is string && data.designation.size() >= 2 && data.designation.size() <= 60 &&
-             data.qualification is string && data.qualification.size() >= 2 && data.qualification.size() <= 80 &&
+             data.qualification is string && data.qualification.size() >= 2 && data.qualification.size() <= 200 &&
+             (!('educations' in data) || (data.educations is list && data.educations.size() <= 10)) &&
              data.specialty is string && data.specialty.size() >= 2 && data.specialty.size() <= 60 &&
              data.division is string && data.division.size() >= 2 && data.division.size() <= 40 &&
              data.district is string && data.district.size() >= 2 && data.district.size() <= 40 &&
              (!('upazila' in data) || (data.upazila is string && data.upazila.size() <= 50)) &&
-             data.hospitalName is string && data.hospitalName.size() >= 3 && data.hospitalName.size() <= 120 &&
+             (!('address' in data) || (data.address is string && data.address.size() <= 200)) &&
+             hasValidHospitalOrAddress(data) &&
              data.phone is string && data.phone.size() >= 11 && data.phone.size() <= 20 &&
              data.whatsapp is string && data.whatsapp.size() >= 11 && data.whatsapp.size() <= 20 &&
              data.email is string && data.email.size() <= 120 &&
@@ -104,7 +123,11 @@ service cloud.firestore {
              data.nurseName is string && data.nurseName.size() >= 3 && data.nurseName.size() <= 80 &&
              data.bnmcNumber is string && data.bnmcNumber.size() >= 4 && data.bnmcNumber.size() <= 30 &&
              data.requestedByUid is string && data.requestedByUid.size() >= 1 && data.requestedByUid.size() <= 128 &&
-             data.currentHospitalName is string && data.currentHospitalName.size() >= 3 && data.currentHospitalName.size() <= 120 &&
+             (!('currentCategory' in data) || data.currentCategory in ['GOVT', 'NON_GOVT', 'STUDENT']) &&
+             (!('newCategory' in data) || data.newCategory in ['GOVT', 'NON_GOVT', 'STUDENT']) &&
+             (!('newGovtUid' in data) || (data.newGovtUid is string && data.newGovtUid.size() <= 40)) &&
+             (!('newDesignation' in data) || (data.newDesignation is string && data.newDesignation.size() <= 60)) &&
+             data.currentHospitalName is string && data.currentHospitalName.size() <= 120 &&
              data.currentDivision is string && data.currentDivision.size() >= 2 && data.currentDivision.size() <= 40 &&
              data.currentDistrict is string && data.currentDistrict.size() >= 2 && data.currentDistrict.size() <= 40 &&
              (!('currentUpazila' in data) || (data.currentUpazila is string && data.currentUpazila.size() <= 50)) &&
@@ -188,8 +211,10 @@ service cloud.firestore {
                          'createdAt', 'updatedAt'
                        ]) &&
                        incoming().keys().hasOnly([
-                         'submittedByUid', 'fullName', 'bnmcNumber', 'designation',
-                         'qualification', 'specialty', 'division', 'district', 'upazila',
+                         'submittedByUid', 'fullName', 'fatherName', 'motherName',
+                         'nurseCategory', 'bnmcNumber', 'govtUid', 'designation',
+                         'qualification', 'educations', 'specialty',
+                         'division', 'district', 'upazila', 'address',
                          'hospitalName', 'phone', 'whatsapp', 'email',
                          'bloodGroup', 'availabilityStatus', 'experienceYears',
                          'bio', 'approvalStatus', 'rejectionReason',
@@ -216,8 +241,10 @@ service cloud.firestore {
                          (
                            isAdmin() &&
                            incoming().diff(existing()).affectedKeys().hasOnly([
-                             'fullName', 'bnmcNumber', 'designation', 'qualification', 'specialty',
-                             'division', 'district', 'upazila', 'hospitalName', 'phone', 'whatsapp',
+                             'fullName', 'fatherName', 'motherName', 'nurseCategory',
+                             'bnmcNumber', 'govtUid', 'designation', 'qualification',
+                             'educations', 'specialty', 'division', 'district', 'upazila',
+                             'address', 'hospitalName', 'phone', 'whatsapp',
                              'email', 'bloodGroup', 'availabilityStatus', 'experienceYears', 'bio',
                              'approvalStatus', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'updatedAt'
                            ])
@@ -226,7 +253,7 @@ service cloud.firestore {
                            existing().submittedByUid == request.auth.uid &&
                            existing().approvalStatus != 'REJECTED' &&
                            incoming().diff(existing()).affectedKeys().hasOnly([
-                             'availabilityStatus', 'phone', 'whatsapp', 'bio', 'updatedAt'
+                             'availabilityStatus', 'phone', 'whatsapp', 'address', 'bio', 'updatedAt'
                            ])
                          )
                        );
@@ -259,6 +286,7 @@ service cloud.firestore {
                        ]) &&
                        incoming().keys().hasOnly([
                          'nurseId', 'nurseName', 'bnmcNumber', 'requestedByUid',
+                         'currentCategory', 'newCategory', 'newGovtUid', 'newDesignation',
                          'currentHospitalName', 'currentDivision', 'currentDistrict', 'currentUpazila',
                          'newHospitalName', 'newDivision', 'newDistrict', 'newUpazila',
                          'transferNote', 'status', 'rejectionReason', 'reviewedBy', 'reviewedAt',

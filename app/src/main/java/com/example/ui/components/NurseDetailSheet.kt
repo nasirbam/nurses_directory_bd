@@ -25,6 +25,8 @@ import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.FamilyRestroom
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MedicalServices
@@ -33,6 +35,7 @@ import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sms
 import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Verified
+import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.WorkHistory
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
@@ -55,8 +58,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.data.ApprovalStatus
+import com.example.data.NurseCategory
 import com.example.data.NurseEntity
 import com.example.ui.ContactActions
+import com.example.ui.theme.StatusApproved
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
@@ -112,33 +118,58 @@ fun NurseDetailBottomSheet(
 
                 Spacer(modifier = Modifier.width(14.dp))
 
-                Column(modifier = Modifier.weight(1f)) {
-                    Row(verticalAlignment = Alignment.CenterVertically) {
-                        Text(
-                            text = nurse.fullName,
-                            style = MaterialTheme.typography.titleLarge,
-                            fontWeight = FontWeight.Bold,
-                            color = MaterialTheme.colorScheme.onSurface
-                        )
-                        Spacer(modifier = Modifier.width(6.dp))
-                        Icon(
-                            imageVector = Icons.Filled.Verified,
-                            contentDescription = "Verified",
-                            tint = MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(18.dp)
-                        )
-                    }
+                Column(
+                    modifier = Modifier.weight(1f),
+                    verticalArrangement = Arrangement.spacedBy(2.dp)
+                ) {
                     Text(
-                        text = nurse.designation,
+                        text = nurse.fullName,
+                        style = MaterialTheme.typography.titleLarge,
+                        fontWeight = FontWeight.Bold,
+                        color = MaterialTheme.colorScheme.onSurface
+                    )
+                    Text(
+                        text = "${nurse.designation} • ${nurse.categoryEnum.shortLabel}",
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.primary,
                         fontWeight = FontWeight.SemiBold
                     )
-                    Text(
-                        text = "BNMC: ${nurse.bnmcNumber}",
-                        style = MaterialTheme.typography.labelMedium,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant
-                    )
+                    FlowRow(
+                        horizontalArrangement = Arrangement.spacedBy(6.dp),
+                        verticalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Text(
+                            text = "${nurse.registrationNumberLabel}: ${nurse.bnmcNumber}",
+                            style = MaterialTheme.typography.labelMedium,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant,
+                            modifier = Modifier.align(Alignment.CenterVertically)
+                        )
+                        if (nurse.approvalEnum == ApprovalStatus.APPROVED) {
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = StatusApproved.copy(alpha = 0.14f)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(horizontal = 7.dp, vertical = 2.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Icon(
+                                        imageVector = Icons.Filled.Verified,
+                                        contentDescription = "Verified",
+                                        tint = StatusApproved,
+                                        modifier = Modifier.size(13.dp)
+                                    )
+                                    Spacer(Modifier.width(4.dp))
+                                    Text(
+                                        text = "Verified",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = StatusApproved
+                                    )
+                                }
+                            }
+                        }
+                    }
                 }
 
                 Surface(
@@ -240,15 +271,39 @@ fun NurseDetailBottomSheet(
             HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
             Spacer(modifier = Modifier.height(14.dp))
 
-            DetailRow(Icons.Filled.LocalHospital, "Workplace / Hospital", nurse.hospitalName)
+            DetailRow(Icons.Filled.VerifiedUser, "Service Category", nurse.categoryEnum.label)
+            if (nurse.govtUid.isNotBlank()) {
+                DetailRow(Icons.Filled.Badge, "Govt. UID", nurse.govtUid)
+            }
+            if (nurse.fatherName.isNotBlank()) {
+                DetailRow(Icons.Filled.FamilyRestroom, "Father's Name", nurse.fatherName)
+            }
+            if (nurse.motherName.isNotBlank()) {
+                DetailRow(Icons.Filled.FamilyRestroom, "Mother's Name", nurse.motherName)
+            }
+            DetailRow(
+                Icons.Filled.LocalHospital,
+                nurse.workplaceLabel,
+                nurse.hospitalName.ifBlank { "Not specified (Non-Govt.)" }
+            )
             val locationText = listOfNotNull(
                 nurse.upazila.takeIf { it.isNotBlank() },
                 nurse.district.takeIf { it.isNotBlank() },
                 nurse.division.takeIf { it.isNotBlank() }?.let { "$it Division" }
             ).joinToString(", ")
             DetailRow(Icons.Filled.LocationOn, "Location", locationText)
+            if (nurse.address.isNotBlank()) {
+                DetailRow(Icons.Filled.Home, "Present Address (ঠিকানা)", nurse.address)
+            }
             DetailRow(Icons.Filled.MedicalServices, "Clinical Specialty", nurse.specialty)
-            DetailRow(Icons.Filled.School, "Qualification", nurse.qualification)
+
+            val degrees = nurse.effectiveEducations()
+            val educationText = if (degrees.isNotEmpty()) {
+                degrees.joinToString("\n") { "• ${it.formattedSummary()}" }
+            } else {
+                nurse.qualification
+            }
+            DetailRow(Icons.Filled.School, "Educational Qualifications", educationText)
             DetailRow(Icons.Filled.WorkHistory, "Experience", "${nurse.experienceYears} Years")
             DetailRow(Icons.Filled.Badge, "Phone / Contact", nurse.phone)
             if (nurse.email.isNotBlank()) {
@@ -292,7 +347,13 @@ fun NurseDetailBottomSheet(
                     ) {
                         Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(8.dp))
-                        Text("Request Hospital Transfer (বদলি আবেদন)")
+                        Text(
+                            if (nurse.categoryEnum == NurseCategory.NON_GOVT) {
+                                "Apply for Govt. Service / Transfer (সরকারি চাকরি / বদলি)"
+                            } else {
+                                "Request Hospital Transfer (বদলি আবেদন)"
+                            }
+                        )
                     }
                 }
 

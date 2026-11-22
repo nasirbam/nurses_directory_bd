@@ -5,14 +5,19 @@ import com.example.data.AdminRole
 import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.EducationEntry
 import com.example.data.LiveNoticeEntity
+import com.example.data.NurseCategory
 import com.example.data.NurseEntity
 import com.example.data.NursesRepository
 import com.example.data.SecurityUtils
 import com.example.data.TransferRequestEntity
 import com.example.data.TransferStatus
+import com.example.ui.PrintColumn
+import com.example.ui.PrintReportHelper
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -23,11 +28,80 @@ class NursesRegistrationRepositoryTest {
         val unknownNurse = NurseEntity(
             fullName = "Tasnim Tabassum",
             bnmcNumber = "BNMC-99001",
+            nurseCategory = "LEGACY_TYPE",
             approvalStatus = "UNKNOWN_STATUS",
             availabilityStatus = "UNKNOWN_SHIFT"
         )
         assertEquals(ApprovalStatus.PENDING, unknownNurse.approvalEnum)
         assertEquals(AvailabilityStatus.ON_DUTY, unknownNurse.availabilityEnum)
+        assertEquals(NurseCategory.GOVT, unknownNurse.categoryEnum)
+    }
+
+    @Test
+    fun nurseCategory_and_multiDegreeEducationSummary_workCorrectly() {
+        val studentNurse = NurseEntity(
+            fullName = "Ruma Akter",
+            nurseCategory = NurseCategory.STUDENT.name,
+            bnmcNumber = "STU-2025-11",
+            hospitalName = "Dhaka Nursing College",
+            educations = listOf(
+                EducationEntry(
+                    courseName = "BSc in Nursing (Basic)",
+                    major = "Midwifery",
+                    university = "DU",
+                    passedYear = "2024"
+                ),
+                EducationEntry(
+                    courseName = "MSN",
+                    major = "Critical Care",
+                    university = "BSMMU",
+                    passedYear = "2026"
+                )
+            )
+        )
+        assertEquals("Student Reg No.", studentNurse.registrationNumberLabel)
+        assertEquals("Educational Institute", studentNurse.workplaceLabel)
+        assertTrue(studentNurse.educationSummaryText().contains("BSc in Nursing (Basic) (Midwifery) — DU, 2024"))
+        assertTrue(studentNurse.educationSummaryText().contains("MSN (Critical Care) — BSMMU, 2026"))
+
+        val legacyNurse = NurseEntity(
+            fullName = "Legacy Nurse",
+            qualification = "Diploma in Nursing Science & Midwifery"
+        )
+        assertEquals(1, legacyNurse.effectiveEducations().size)
+        assertEquals("Diploma in Nursing Science & Midwifery", legacyNurse.educationSummaryText())
+    }
+
+    @Test
+    fun adminEntity_divisionalScopeAndRoleFallbackWorkCorrectly() {
+        val unknownAdmin = AdminEntity(
+            fullName = "Test Admin",
+            email = "test@gmail.com",
+            role = "LEGACY_ROLE",
+            assignedDivision = "All Bangladesh"
+        )
+        assertEquals(AdminRole.MODERATOR, unknownAdmin.roleEnum)
+        assertFalse(unknownAdmin.isDivisionRestricted)
+        assertNull(unknownAdmin.effectiveDivisionScope)
+        assertEquals("mdnasirnaznin@gmail.com", NursesRepository.BOOTSTRAP_ADMIN_EMAIL)
+
+        val divisionalAdmin = AdminEntity(
+            fullName = "Dhaka Admin",
+            email = "dhaka.admin@gmail.com",
+            role = AdminRole.MODERATOR.name,
+            assignedDivision = "Dhaka"
+        )
+        assertTrue(divisionalAdmin.isDivisionRestricted)
+        assertEquals("Dhaka", divisionalAdmin.effectiveDivisionScope)
+
+        val superAdminWithDiv = AdminEntity(
+            fullName = "Super Admin",
+            email = "super@gmail.com",
+            role = AdminRole.SUPER_ADMIN.name,
+            assignedDivision = "Dhaka"
+        )
+        assertFalse(superAdminWithDiv.isDivisionRestricted)
+        assertNull(superAdminWithDiv.effectiveDivisionScope)
     }
 
     @Test
@@ -37,9 +111,13 @@ class NursesRegistrationRepositoryTest {
             nurseName = "Nusrat Jahan",
             currentHospitalName = "DMCH",
             newHospitalName = "CMCH",
+            currentCategory = NurseCategory.NON_GOVT.name,
+            newCategory = NurseCategory.GOVT.name,
             status = "UNEXPECTED_STATUS"
         )
         assertEquals(TransferStatus.PENDING, unknownTransfer.statusEnum)
+        assertEquals(NurseCategory.NON_GOVT, unknownTransfer.currentCategoryEnum)
+        assertEquals(NurseCategory.GOVT, unknownTransfer.newCategoryEnum)
 
         val approvedTransfer = unknownTransfer.copy(status = TransferStatus.APPROVED.name)
         assertEquals(TransferStatus.APPROVED, approvedTransfer.statusEnum)
@@ -50,14 +128,41 @@ class NursesRegistrationRepositoryTest {
     }
 
     @Test
-    fun adminEntity_safeRoleFallbackAndBootstrapEmailAreConfigured() {
-        val unknownAdmin = AdminEntity(
-            fullName = "Test Admin",
-            email = "test@gmail.com",
-            role = "LEGACY_ROLE"
+    fun bangladeshData_includesMidwifeStudentCoursesAndPrintEscapesHtml() {
+        assertTrue("Midwife" in BangladeshData.designations)
+        assertTrue("Student Nurse" in BangladeshData.designations)
+        assertTrue("PhD" in BangladeshData.courseNames)
+        assertTrue("MSN" in BangladeshData.courseNames)
+        assertTrue("BSc in Nursing (Basic)" in BangladeshData.courseNames)
+        assertTrue("BSc in Nursing (Post Basic)" in BangladeshData.courseNames)
+        assertTrue("BSc in Public Health Nursing (Post Basic)" in BangladeshData.courseNames)
+        assertTrue("BSc in Midwifery" in BangladeshData.courseNames)
+        assertTrue("Diploma in Nursing Science & Midwifery" in BangladeshData.courseNames)
+        assertTrue("Diploma in Nursing" in BangladeshData.courseNames)
+        assertTrue("Diploma in Midwifery" in BangladeshData.courseNames)
+
+        val nurse = NurseEntity(
+            fullName = "Nusrat <script>alert(1)</script>",
+            fatherName = "Karim Mia",
+            motherName = "Amena Begum",
+            bnmcNumber = "BNMC-101",
+            govtUid = "UID-8899",
+            approvalStatus = ApprovalStatus.APPROVED.name,
+            phone = "01711223344",
+            division = "Dhaka",
+            district = "Dhaka"
         )
-        assertEquals(AdminRole.MODERATOR, unknownAdmin.roleEnum)
-        assertEquals("mdnasirnaznin@gmail.com", NursesRepository.BOOTSTRAP_ADMIN_EMAIL)
+        val html = PrintReportHelper.buildReportHtml(
+            nurses = listOf(nurse),
+            selectedColumns = listOf(PrintColumn.NAME, PrintColumn.FATHER_NAME, PrintColumn.REG_NO, PrintColumn.GOVT_UID),
+            reportTitle = "Test Report",
+            scopeSubtitle = "Dhaka Division",
+            generatedBy = "Admin"
+        )
+        assertFalse(html.contains("<script>alert(1)</script>"))
+        assertTrue(html.contains("Verified"))
+        assertTrue(html.contains("Karim Mia"))
+        assertTrue(html.contains("UID-8899"))
     }
 
     @Test

@@ -10,6 +10,7 @@ import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
 import com.example.data.LiveNoticeEntity
+import com.example.data.NurseCategory
 import com.example.data.NurseEntity
 import com.example.data.NursesRepository
 import com.example.data.TransferRequestEntity
@@ -40,6 +41,7 @@ sealed interface UiState<out T> {
 
 data class DirectoryFilterState(
     val searchQuery: String = "",
+    val selectedCategory: String = "All",
     val selectedDivision: String = "All",
     val selectedDistrict: String = "All",
     val selectedUpazila: String = "All",
@@ -85,6 +87,7 @@ data class AdminSessionState(
     val isCheckingRole: Boolean = true,
     val isAuthorizedAdmin: Boolean = false,
     val isSuperAdmin: Boolean = false,
+    val effectiveDivisionScope: String? = null,
     val primaryBootstrapEmail: String = NursesRepository.BOOTSTRAP_ADMIN_EMAIL
 )
 
@@ -226,26 +229,6 @@ class NursesViewModel(
                 initialValue = UiState.Loading
             )
 
-    val allNurses: StateFlow<List<NurseEntity>> = adminNursesState.map { state ->
-        (state as? UiState.Success)?.data ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
-
-    val mySubmissions: StateFlow<List<NurseEntity>> = mySubmissionsState.map { state ->
-        (state as? UiState.Success)?.data ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
-
-    val myTransferRequests: StateFlow<List<TransferRequestEntity>> = myTransferRequestsState.map { state ->
-        (state as? UiState.Success)?.data ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
-
-    val adminTransferRequests: StateFlow<List<TransferRequestEntity>> = adminTransferRequestsState.map { state ->
-        (state as? UiState.Success)?.data ?: emptyList()
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
-
-    val liveNotice: StateFlow<LiveNoticeEntity?> = liveNoticeState.map { state ->
-        (state as? UiState.Success)?.data
-    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
-
     val adminSessionState: StateFlow<AdminSessionState> = combine(
         myAdminDocState,
         adminListState
@@ -266,13 +249,15 @@ class NursesViewModel(
         }
         val authorized = effectiveAdmin != null
         val isSuper = isBootstrapEmail || effectiveAdmin?.roleEnum == AdminRole.SUPER_ADMIN
+        val divisionScope = if (isBootstrapEmail) null else effectiveAdmin?.effectiveDivisionScope
         AdminSessionState(
             currentAdmin = effectiveAdmin,
             admins = admins,
             signedInEmail = currentUserEmail,
             isCheckingRole = myDocState is UiState.Loading && !isBootstrapEmail,
             isAuthorizedAdmin = authorized,
-            isSuperAdmin = isSuper
+            isSuperAdmin = isSuper,
+            effectiveDivisionScope = divisionScope
         )
     }.stateIn(
         viewModelScope,
@@ -284,6 +269,43 @@ class NursesViewModel(
             isSuperAdmin = isBootstrapEmail
         )
     )
+
+    val allNurses: StateFlow<List<NurseEntity>> = combine(
+        adminNursesState,
+        adminSessionState
+    ) { state, session ->
+        val raw = (state as? UiState.Success)?.data ?: emptyList()
+        val scope = session.effectiveDivisionScope
+        if (scope == null) raw else raw.filter { it.division.equals(scope, ignoreCase = true) }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val mySubmissions: StateFlow<List<NurseEntity>> = mySubmissionsState.map { state ->
+        (state as? UiState.Success)?.data ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val myTransferRequests: StateFlow<List<TransferRequestEntity>> = myTransferRequestsState.map { state ->
+        (state as? UiState.Success)?.data ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val adminTransferRequests: StateFlow<List<TransferRequestEntity>> = combine(
+        adminTransferRequestsState,
+        adminSessionState
+    ) { state, session ->
+        val raw = (state as? UiState.Success)?.data ?: emptyList()
+        val scope = session.effectiveDivisionScope
+        if (scope == null) {
+            raw
+        } else {
+            raw.filter {
+                it.newDivision.equals(scope, ignoreCase = true) ||
+                    it.currentDivision.equals(scope, ignoreCase = true)
+            }
+        }
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val liveNotice: StateFlow<LiveNoticeEntity?> = liveNoticeState.map { state ->
+        (state as? UiState.Success)?.data
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     val directoryUiState: StateFlow<DirectoryUiState> = combine(
         approvedNursesState,
@@ -338,14 +360,24 @@ class NursesViewModel(
                 val filtered = approved.filter { nurse ->
                     val matchesQuery = q.isEmpty() ||
                         nurse.fullName.lowercase().contains(q) ||
+                        nurse.fatherName.lowercase().contains(q) ||
+                        nurse.motherName.lowercase().contains(q) ||
                         nurse.hospitalName.lowercase().contains(q) ||
+                        nurse.address.lowercase().contains(q) ||
                         nurse.district.lowercase().contains(q) ||
                         nurse.upazila.lowercase().contains(q) ||
                         nurse.division.lowercase().contains(q) ||
                         nurse.bnmcNumber.lowercase().contains(q) ||
+                        nurse.govtUid.lowercase().contains(q) ||
+                        nurse.designation.lowercase().contains(q) ||
+                        nurse.qualification.lowercase().contains(q) ||
+                        nurse.educationSummaryText().lowercase().contains(q) ||
                         nurse.specialty.lowercase().contains(q) ||
                         nurse.phone.contains(q) ||
                         (qDigits.isNotEmpty() && nurse.phone.filter { it.isDigit() }.contains(qDigits))
+
+                    val matchesCategory = filters.selectedCategory == "All" ||
+                        nurse.categoryEnum.name == filters.selectedCategory
 
                     val matchesDivision = filters.selectedDivision == "All" ||
                         nurse.division.equals(filters.selectedDivision, ignoreCase = true)
@@ -369,8 +401,9 @@ class NursesViewModel(
                         nurse.availabilityEnum == AvailabilityStatus.EMERGENCY_AVAILABLE ||
                         nurse.availabilityEnum == AvailabilityStatus.ON_DUTY
 
-                    matchesQuery && matchesDivision && matchesDistrict && matchesUpazila &&
-                        matchesHospital && matchesSpecialty && matchesBlood && matchesEmergency
+                    matchesQuery && matchesCategory && matchesDivision && matchesDistrict &&
+                        matchesUpazila && matchesHospital && matchesSpecialty &&
+                        matchesBlood && matchesEmergency
                 }
                 DirectoryUiState(
                     isLoading = false,
@@ -430,10 +463,10 @@ class NursesViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), NurseListUiState())
 
     val analyticsSummary: StateFlow<AnalyticsSummary> = combine(
-        adminNursesState,
-        adminListState
-    ) { nursesState, adminsState ->
-        val nurses = (nursesState as? UiState.Success)?.data ?: emptyList()
+        allNurses,
+        adminListState,
+        adminSessionState
+    ) { nurses, adminsState, session ->
         val admins = (adminsState as? UiState.Success)?.data ?: emptyList()
 
         val approved = nurses.filter { it.approvalEnum == ApprovalStatus.APPROVED }
@@ -442,7 +475,8 @@ class NursesViewModel(
         val emergencyReady = approved.count {
             it.availabilityEnum == AvailabilityStatus.EMERGENCY_AVAILABLE
         }
-        val divisionCounts = BangladeshData.divisions.map { div ->
+        val targetDivisions = session.effectiveDivisionScope?.let { listOf(it) } ?: BangladeshData.divisions
+        val divisionCounts = targetDivisions.map { div ->
             StatCount(
                 label = div,
                 count = approved.count { it.division.equals(div, ignoreCase = true) }
@@ -485,6 +519,10 @@ class NursesViewModel(
 
     fun updateSearchQuery(query: String) {
         _filters.update { it.copy(searchQuery = query) }
+    }
+
+    fun selectCategoryFilter(category: String) {
+        _filters.update { it.copy(selectedCategory = category) }
     }
 
     fun selectDivisionFilter(division: String) {
@@ -555,10 +593,15 @@ class NursesViewModel(
 
     fun submitRegistration(
         nurse: NurseEntity,
+        autoApproveAsAdmin: Boolean = false,
         onResult: (Result<Unit>) -> Unit
     ) {
+        val canAutoApprove = autoApproveAsAdmin && adminSessionState.value.isAuthorizedAdmin
         viewModelScope.launch {
-            val result = repository.submitRegistration(nurse)
+            val result = repository.submitRegistration(
+                nurse = nurse,
+                autoApproveAsAdmin = canAutoApprove
+            )
             onResult(result)
         }
     }
@@ -623,6 +666,9 @@ class NursesViewModel(
         newUpazila: String,
         newHospitalName: String,
         transferNote: String,
+        newCategory: NurseCategory = nurse.categoryEnum,
+        newGovtUid: String = nurse.govtUid,
+        newDesignation: String = nurse.designation,
         onResult: (Result<Unit>) -> Unit
     ) {
         viewModelScope.launch {
@@ -632,7 +678,10 @@ class NursesViewModel(
                 newDistrict = newDistrict,
                 newUpazila = newUpazila,
                 newHospitalName = newHospitalName,
-                transferNote = transferNote
+                transferNote = transferNote,
+                newCategory = newCategory,
+                newGovtUid = newGovtUid,
+                newDesignation = newDesignation
             )
             onResult(result)
         }

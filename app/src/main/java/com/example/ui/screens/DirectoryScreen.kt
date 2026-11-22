@@ -71,6 +71,7 @@ import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.BangladeshData
 import com.example.data.LiveNoticeEntity
+import com.example.data.NurseCategory
 import com.example.data.NurseEntity
 import com.example.ui.ContactActions
 import com.example.ui.DirectoryUiState
@@ -80,6 +81,7 @@ fun DirectoryScreen(
     uiState: DirectoryUiState,
     liveNotice: LiveNoticeEntity? = null,
     onSearchQueryChange: (String) -> Unit,
+    onSelectCategory: (String) -> Unit = {},
     onSelectDivision: (String) -> Unit,
     onSelectDistrict: (String) -> Unit,
     onSelectUpazila: (String) -> Unit,
@@ -99,7 +101,8 @@ fun DirectoryScreen(
     var showBloodMenu by remember { mutableStateOf(false) }
 
     val divisionsWithAll = remember { listOf("All") + BangladeshData.divisions }
-    val hasActiveExtraFilter = uiState.filters.selectedDistrict != "All" ||
+    val hasActiveExtraFilter = uiState.filters.selectedCategory != "All" ||
+        uiState.filters.selectedDistrict != "All" ||
         uiState.filters.selectedUpazila != "All" ||
         uiState.filters.selectedHospital != "All" ||
         uiState.filters.selectedSpecialty != "All" ||
@@ -284,9 +287,38 @@ fun DirectoryScreen(
                 )
             }
 
-            // Division Chips
+            // Category & Division Chips
             item(span = { GridItemSpan(columns) }) {
                 Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    LazyRow(
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        item {
+                            FilterChip(
+                                selected = uiState.filters.selectedCategory == "All",
+                                onClick = { onSelectCategory("All") },
+                                label = { Text("All Categories") },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                                ),
+                                modifier = Modifier.testTag("category_chip_all")
+                            )
+                        }
+                        items(NurseCategory.entries) { cat ->
+                            FilterChip(
+                                selected = uiState.filters.selectedCategory == cat.name,
+                                onClick = { onSelectCategory(cat.name) },
+                                label = { Text(cat.label) },
+                                colors = FilterChipDefaults.filterChipColors(
+                                    selectedContainerColor = MaterialTheme.colorScheme.secondary,
+                                    selectedLabelColor = MaterialTheme.colorScheme.onSecondary
+                                ),
+                                modifier = Modifier.testTag("category_chip_${cat.name.lowercase()}")
+                            )
+                        }
+                    }
+
                     LazyRow(
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {

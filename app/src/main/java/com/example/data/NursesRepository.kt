@@ -188,29 +188,64 @@ class NursesRepository(
         )
     }
 
-    suspend fun submitRegistration(nurse: NurseEntity): Result<Unit> {
+    suspend fun submitRegistration(
+        nurse: NurseEntity,
+        autoApproveAsAdmin: Boolean = false
+    ): Result<Unit> {
         var docPath = "nurses"
         return try {
             val uid = requireUserId()
             val cleanedName = nurse.fullName.trim()
+            val cleanedFather = nurse.fatherName.trim().take(80)
+            val cleanedMother = nurse.motherName.trim().take(80)
+            val category = nurse.categoryEnum
             val cleanedBnmc = nurse.bnmcNumber.trim().uppercase()
+            val cleanedGovtUid = nurse.govtUid.trim().take(40)
             val cleanedPhone = nurse.phone.replace(Regex("[\\s\\-]"), "")
             val cleanedHospital = nurse.hospitalName.trim()
+            val cleanedAddress = nurse.address.trim().take(200)
             val cleanedEmail = nurse.email.trim()
             val cleanedBio = nurse.bio.trim()
             val expYears = nurse.experienceYears.coerceIn(0, 60)
+            val cleanedEducations = nurse.effectiveEducations()
+                .filter { it.courseName.isNotBlank() }
+                .take(10)
+            val qualificationSummary = nurse.educationSummaryText()
+                .ifBlank { nurse.qualification }
+                .trim()
+                .take(200)
 
             require(cleanedName.length in 3..80) {
                 "Full name must be between 3 and 80 characters."
             }
             require(cleanedBnmc.length in 4..30) {
-                "BNMC registration number must be between 4 and 30 characters."
+                if (category == NurseCategory.STUDENT) {
+                    "Student registration number must be between 4 and 30 characters."
+                } else {
+                    "BNMC registration number must be between 4 and 30 characters."
+                }
             }
             require(SecurityUtils.isValidBangladeshPhone(cleanedPhone) && cleanedPhone.length in 11..20) {
                 "Enter a valid Bangladeshi phone number (e.g. 017XXXXXXXX)."
             }
-            require(cleanedHospital.length in 3..120) {
-                "Hospital or workplace name must be between 3 and 120 characters."
+            when (category) {
+                NurseCategory.GOVT -> require(cleanedHospital.length in 3..120) {
+                    "Govt. hospital or workplace name must be between 3 and 120 characters."
+                }
+                NurseCategory.STUDENT -> require(cleanedHospital.length in 3..120) {
+                    "Educational institute name must be between 3 and 120 characters."
+                }
+                NurseCategory.NON_GOVT -> {
+                    require(cleanedHospital.length <= 120) {
+                        "Working place name must be 120 characters or less."
+                    }
+                    require(cleanedAddress.length >= 3 || cleanedHospital.length >= 3) {
+                        "Present address (thikana) is required for Non-Govt. nurses."
+                    }
+                }
+            }
+            require(qualificationSummary.length in 2..200) {
+                "Select at least one educational course."
             }
             if (cleanedEmail.isNotBlank()) {
                 require(SecurityUtils.isValidEmail(cleanedEmail) && cleanedEmail.length <= 120) {
@@ -234,7 +269,7 @@ class NursesRepository(
                 }
             }
 
-            // Duplicate BNMC guard across approved directory and user's own submissions (rules-aligned)
+            // Duplicate BNMC/Student Reg guard across approved directory and user's own submissions (rules-aligned)
             val approvedDup = db.collection("nurses")
                 .whereEqualTo("approvalStatus", ApprovalStatus.APPROVED.name)
                 .get()
@@ -250,22 +285,29 @@ class NursesRepository(
                 .any { it.bnmcNumber.equals(cleanedBnmc, ignoreCase = true) }
 
             require(!approvedDup && !ownDup) {
-                "BNMC number $cleanedBnmc is already registered in the directory."
+                "Registration number $cleanedBnmc is already registered in the directory."
             }
 
             val docRef = db.collection("nurses").document()
             docPath = docRef.path
 
-            val payload = mapOf(
+            val reviewerEmail = auth.currentUser?.email?.trim()?.lowercase()?.take(128)
+            val payload = mutableMapOf<String, Any>(
                 "submittedByUid" to uid,
                 "fullName" to cleanedName,
+                "fatherName" to cleanedFather,
+                "motherName" to cleanedMother,
+                "nurseCategory" to category.name,
                 "bnmcNumber" to cleanedBnmc,
+                "govtUid" to cleanedGovtUid,
                 "designation" to nurse.designation.trim().take(60),
-                "qualification" to nurse.qualification.trim().take(80),
+                "qualification" to qualificationSummary,
+                "educations" to cleanedEducations.map { it.toFirestoreMap() },
                 "specialty" to nurse.specialty.trim().take(60),
                 "division" to nurse.division.trim().take(40),
                 "district" to nurse.district.trim().take(40),
                 "upazila" to nurse.upazila.trim().take(50),
+                "address" to cleanedAddress,
                 "hospitalName" to cleanedHospital,
                 "phone" to cleanedPhone,
                 "whatsapp" to whatsappNumber,
@@ -274,11 +316,15 @@ class NursesRepository(
                 "availabilityStatus" to nurse.availabilityEnum.name,
                 "experienceYears" to expYears,
                 "bio" to cleanedBio,
-                "approvalStatus" to ApprovalStatus.PENDING.name,
+                "approvalStatus" to if (autoApproveAsAdmin) ApprovalStatus.APPROVED.name else ApprovalStatus.PENDING.name,
                 "rejectionReason" to "",
                 "createdAt" to FieldValue.serverTimestamp(),
                 "updatedAt" to FieldValue.serverTimestamp()
             )
+            if (autoApproveAsAdmin && !reviewerEmail.isNullOrBlank()) {
+                payload["reviewedBy"] = reviewerEmail
+                payload["reviewedAt"] = FieldValue.serverTimestamp()
+            }
 
             docRef.set(payload).await()
             Result.success(Unit)
@@ -436,24 +482,52 @@ class NursesRepository(
             require(updatedNurse.id.isNotBlank()) { "Missing nurse document ID." }
 
             val cleanedName = updatedNurse.fullName.trim()
+            val cleanedFather = updatedNurse.fatherName.trim().take(80)
+            val cleanedMother = updatedNurse.motherName.trim().take(80)
+            val category = updatedNurse.categoryEnum
             val cleanedBnmc = updatedNurse.bnmcNumber.trim().uppercase()
+            val cleanedGovtUid = updatedNurse.govtUid.trim().take(40)
             val cleanedPhone = updatedNurse.phone.replace(Regex("[\\s\\-]"), "")
             val cleanedHospital = updatedNurse.hospitalName.trim()
+            val cleanedAddress = updatedNurse.address.trim().take(200)
             val cleanedEmail = updatedNurse.email.trim()
             val cleanedBio = updatedNurse.bio.trim()
             val expYears = updatedNurse.experienceYears.coerceIn(0, 60)
+            val cleanedEducations = updatedNurse.effectiveEducations()
+                .filter { it.courseName.isNotBlank() }
+                .take(10)
+            val qualificationSummary = updatedNurse.educationSummaryText()
+                .ifBlank { updatedNurse.qualification }
+                .trim()
+                .take(200)
 
             require(cleanedName.length in 3..80) {
                 "Full name must be between 3 and 80 characters."
             }
             require(cleanedBnmc.length in 4..30) {
-                "BNMC registration number must be between 4 and 30 characters."
+                "Registration number must be between 4 and 30 characters."
             }
             require(SecurityUtils.isValidBangladeshPhone(cleanedPhone) && cleanedPhone.length in 11..20) {
                 "Enter a valid Bangladeshi phone number (e.g. 017XXXXXXXX)."
             }
-            require(cleanedHospital.length in 3..120) {
-                "Hospital or workplace name must be between 3 and 120 characters."
+            when (category) {
+                NurseCategory.GOVT -> require(cleanedHospital.length in 3..120) {
+                    "Hospital or workplace name must be between 3 and 120 characters."
+                }
+                NurseCategory.STUDENT -> require(cleanedHospital.length in 3..120) {
+                    "Educational institute name must be between 3 and 120 characters."
+                }
+                NurseCategory.NON_GOVT -> {
+                    require(cleanedHospital.length <= 120) {
+                        "Working place name must be 120 characters or less."
+                    }
+                    require(cleanedAddress.length >= 3 || cleanedHospital.length >= 3) {
+                        "Present address (thikana) is required for Non-Govt. nurses."
+                    }
+                }
+            }
+            require(qualificationSummary.length in 2..200) {
+                "Select at least one educational course."
             }
             if (cleanedEmail.isNotBlank()) {
                 require(SecurityUtils.isValidEmail(cleanedEmail) && cleanedEmail.length <= 120) {
@@ -485,18 +559,24 @@ class NursesRepository(
                 .any { it.id != updatedNurse.id }
 
             require(!duplicateBnmc) {
-                "BNMC number $cleanedBnmc is already assigned to another nurse."
+                "Registration number $cleanedBnmc is already assigned to another nurse."
             }
 
             val updates = mapOf(
                 "fullName" to cleanedName,
+                "fatherName" to cleanedFather,
+                "motherName" to cleanedMother,
+                "nurseCategory" to category.name,
                 "bnmcNumber" to cleanedBnmc,
+                "govtUid" to cleanedGovtUid,
                 "designation" to updatedNurse.designation.trim().take(60),
-                "qualification" to updatedNurse.qualification.trim().take(80),
+                "qualification" to qualificationSummary,
+                "educations" to cleanedEducations.map { it.toFirestoreMap() },
                 "specialty" to updatedNurse.specialty.trim().take(60),
                 "division" to updatedNurse.division.trim().take(40),
                 "district" to updatedNurse.district.trim().take(40),
                 "upazila" to updatedNurse.upazila.trim().take(50),
+                "address" to cleanedAddress,
                 "hospitalName" to cleanedHospital,
                 "phone" to cleanedPhone,
                 "whatsapp" to whatsappNumber,
@@ -541,7 +621,10 @@ class NursesRepository(
         newDistrict: String,
         newUpazila: String,
         newHospitalName: String,
-        transferNote: String
+        transferNote: String,
+        newCategory: NurseCategory = nurse.categoryEnum,
+        newGovtUid: String = nurse.govtUid,
+        newDesignation: String = nurse.designation
     ): Result<Unit> {
         var docPath = "transfer_requests"
         return try {
@@ -551,7 +634,7 @@ class NursesRepository(
                 "You can only request a transfer for a profile registered with your account."
             }
             require(nurse.approvalEnum == ApprovalStatus.APPROVED) {
-                "Only approved nurse profiles can request a hospital transfer."
+                "Only approved nurse profiles can request a transfer."
             }
 
             val cleanNewHospital = newHospitalName.trim()
@@ -559,19 +642,26 @@ class NursesRepository(
             val cleanNewDist = newDistrict.trim().take(40)
             val cleanNewUpazila = newUpazila.trim().take(50)
             val cleanNote = transferNote.trim().take(250)
+            val cleanGovtUid = newGovtUid.trim().take(40)
+            val cleanDesignation = newDesignation.trim().take(60)
 
             require(cleanNewHospital.length in 3..120) {
-                "New hospital name must be between 3 and 120 characters."
+                if (newCategory == NurseCategory.GOVT) {
+                    "Govt. working place / hospital name is mandatory (3–120 characters)."
+                } else {
+                    "New hospital / workplace name must be between 3 and 120 characters."
+                }
             }
             require(cleanNewDiv.length in 2..40 && cleanNewDist.length in 2..40) {
                 "Select valid destination division and district."
             }
 
-            val hasSameHospital = cleanNewHospital.equals(nurse.hospitalName.trim(), ignoreCase = true) &&
+            val hasSameState = newCategory == nurse.categoryEnum &&
+                cleanNewHospital.equals(nurse.hospitalName.trim(), ignoreCase = true) &&
                 cleanNewDist.equals(nurse.district.trim(), ignoreCase = true) &&
                 cleanNewUpazila.equals(nurse.upazila.trim(), ignoreCase = true)
-            require(!hasSameHospital) {
-                "New hospital/location must be different from your current workplace."
+            require(!hasSameState) {
+                "New workplace/category must be different from your current profile."
             }
 
             val existingPending = db.collection("transfer_requests")
@@ -592,6 +682,10 @@ class NursesRepository(
                 "nurseName" to nurse.fullName.trim().take(80),
                 "bnmcNumber" to nurse.bnmcNumber.trim().take(30),
                 "requestedByUid" to uid,
+                "currentCategory" to nurse.categoryEnum.name,
+                "newCategory" to newCategory.name,
+                "newGovtUid" to cleanGovtUid,
+                "newDesignation" to cleanDesignation,
                 "currentHospitalName" to nurse.hospitalName.trim().take(120),
                 "currentDivision" to nurse.division.trim().take(40),
                 "currentDistrict" to nurse.district.trim().take(40),
@@ -632,18 +726,26 @@ class NursesRepository(
             val nurseRef = db.collection("nurses").document(request.nurseId)
             val reqRef = db.collection("transfer_requests").document(request.id)
 
-            batch.update(
-                nurseRef,
-                mapOf(
-                    "division" to request.newDivision.trim().take(40),
-                    "district" to request.newDistrict.trim().take(40),
-                    "upazila" to request.newUpazila.trim().take(50),
-                    "hospitalName" to request.newHospitalName.trim().take(120),
-                    "reviewedBy" to cleanReviewer,
-                    "reviewedAt" to FieldValue.serverTimestamp(),
-                    "updatedAt" to FieldValue.serverTimestamp()
-                )
+            val nurseUpdateMap = mutableMapOf<String, Any>(
+                "division" to request.newDivision.trim().take(40),
+                "district" to request.newDistrict.trim().take(40),
+                "upazila" to request.newUpazila.trim().take(50),
+                "hospitalName" to request.newHospitalName.trim().take(120),
+                "reviewedBy" to cleanReviewer,
+                "reviewedAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp()
             )
+            if (request.newCategory.isNotBlank()) {
+                nurseUpdateMap["nurseCategory"] = request.newCategoryEnum.name
+            }
+            if (request.newGovtUid.isNotBlank()) {
+                nurseUpdateMap["govtUid"] = request.newGovtUid.trim().take(40)
+            }
+            if (request.newDesignation.isNotBlank()) {
+                nurseUpdateMap["designation"] = request.newDesignation.trim().take(60)
+            }
+
+            batch.update(nurseRef, nurseUpdateMap)
             batch.update(
                 reqRef,
                 mapOf(
@@ -778,13 +880,19 @@ class NursesRepository(
                         val data = mutableMapOf<String, Any>(
                             "submittedByUid" to uid,
                             "fullName" to nurse.fullName,
+                            "fatherName" to nurse.fatherName,
+                            "motherName" to nurse.motherName,
+                            "nurseCategory" to nurse.nurseCategory,
                             "bnmcNumber" to nurse.bnmcNumber,
+                            "govtUid" to nurse.govtUid,
                             "designation" to nurse.designation,
                             "qualification" to nurse.qualification,
+                            "educations" to nurse.effectiveEducations().map { it.toFirestoreMap() },
                             "specialty" to nurse.specialty,
                             "division" to nurse.division,
                             "district" to nurse.district,
                             "upazila" to nurse.upazila,
+                            "address" to nurse.address,
                             "hospitalName" to nurse.hospitalName,
                             "phone" to nurse.phone,
                             "whatsapp" to nurse.whatsapp,

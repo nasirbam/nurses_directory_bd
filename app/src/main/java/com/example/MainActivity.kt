@@ -275,7 +275,7 @@ private fun GuestPortal(
                 RegisterScreen(
                     isSignedIn = false,
                     onGoogleAuthSuccess = { onAuthSuccessFromRoute(Routes.REGISTER) },
-                    onSubmitRegistration = { _, cb ->
+                    onSubmitRegistration = { _, _, cb ->
                         cb(Result.failure(IllegalStateException("Sign in with Google first.")))
                     },
                     onNavigateAfterSuccess = {
@@ -484,6 +484,7 @@ fun NursesBDApp(
                                 uiState = directoryState,
                                 liveNotice = liveNotice,
                                 onSearchQueryChange = viewModel::updateSearchQuery,
+                                onSelectCategory = viewModel::selectCategoryFilter,
                                 onSelectDivision = viewModel::selectDivisionFilter,
                                 onSelectDistrict = viewModel::selectDistrictFilter,
                                 onSelectUpazila = viewModel::selectUpazilaFilter,
@@ -509,11 +510,13 @@ fun NursesBDApp(
                             RegisterScreen(
                                 isSignedIn = true,
                                 signedInEmail = viewModel.currentUserEmail,
+                                prefillName = adminSession.currentAdmin?.fullName ?: "",
+                                isAdminUser = adminSession.isAuthorizedAdmin,
                                 mySubmissions = mySubmissions,
                                 myTransferRequests = myTransferRequests,
                                 onRequestTransfer = { nurseForTransfer = it },
-                                onSubmitRegistration = { nurse, cb ->
-                                    viewModel.submitRegistration(nurse, cb)
+                                onSubmitRegistration = { nurse, autoApprove, cb ->
+                                    viewModel.submitRegistration(nurse, autoApprove, cb)
                                 },
                                 onNavigateAfterSuccess = { navigateTo(Routes.DIRECTORY) },
                                 successActionLabel = "View Directory"
@@ -527,6 +530,8 @@ fun NursesBDApp(
                                 allNurses = allNurses,
                                 transferRequests = adminTransferRequests,
                                 liveNotice = liveNotice,
+                                hasOwnNurseProfile = mySubmissions.isNotEmpty(),
+                                onRegisterSelfAsNurse = { navigateTo(Routes.REGISTER) },
                                 onSignOutAndSwitch = onSignOut,
                                 onApproveNurse = viewModel::approveNurse,
                                 onRejectNurse = viewModel::rejectNurse,
@@ -596,14 +601,17 @@ fun NursesBDApp(
         RequestTransferDialog(
             nurse = target,
             onDismiss = { nurseForTransfer = null },
-            onSubmit = { newDiv, newDist, newUpazila, newHospital, note, onError ->
+            onSubmit = { newCat, newUid, newDesig, newDiv, newDist, newUpazila, newHospital, note, onError ->
                 viewModel.submitTransferRequest(
                     nurse = target,
                     newDivision = newDiv,
                     newDistrict = newDist,
                     newUpazila = newUpazila,
                     newHospitalName = newHospital,
-                    transferNote = note
+                    transferNote = note,
+                    newCategory = newCat,
+                    newGovtUid = newUid,
+                    newDesignation = newDesig
                 ) { res ->
                     res.onSuccess {
                         nurseForTransfer = null

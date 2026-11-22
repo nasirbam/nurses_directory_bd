@@ -148,19 +148,31 @@ object BangladeshData {
         "Nursing Supervisor",
         "Nursing Officer",
         "Staff Nurse",
+        "Midwife",
         "Certified Midwife",
+        "Senior Midwife",
+        "Student Nurse",
+        "Student Midwife",
         "ICU Specialist Nurse",
         "OT Nurse",
         "Community Health Nurse"
     )
 
-    val qualifications: List<String> = listOf(
-        "B.Sc in Nursing",
-        "Diploma in Nursing & Midwifery",
-        "Post-Basic B.Sc in Nursing",
-        "M.Sc in Nursing",
-        "Diploma in Midwifery"
+    val courseNames: List<String> = listOf(
+        "PhD",
+        "MSN",
+        "BSc in Nursing (Basic)",
+        "BSc in Nursing (Post Basic)",
+        "BSc in Public Health Nursing (Post Basic)",
+        "BSc in Midwifery",
+        "Diploma in Nursing Science & Midwifery",
+        "Diploma in Nursing",
+        "Diploma in Midwifery",
+        "MPH",
+        "Other"
     )
+
+    val qualifications: List<String> = courseNames
 
     val bloodGroups: List<String> = listOf(
         "A+", "A-", "B+", "B-", "O+", "O-", "AB+", "AB-"

@@ -21,12 +21,16 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.Email
+import androidx.compose.material.icons.filled.FamilyRestroom
+import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.HowToReg
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -60,29 +64,38 @@ import androidx.compose.ui.unit.dp
 import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.EducationEntry
+import com.example.data.NurseCategory
 import com.example.data.NurseEntity
 import com.example.data.SecurityUtils
 import com.example.data.TransferRequestEntity
 import com.example.data.TransferStatus
 import com.example.ui.auth.GoogleSignInButton
+import com.example.ui.components.EducationInputSection
 import com.example.ui.theme.StatusApproved
 import com.example.ui.theme.StatusPending
 import com.example.ui.theme.StatusRejected
 
 private data class RegistrationFieldErrors(
     val fullNameError: String? = null,
+    val fatherNameError: String? = null,
+    val motherNameError: String? = null,
     val bnmcError: String? = null,
     val phoneError: String? = null,
     val whatsappError: String? = null,
     val emailError: String? = null,
+    val addressError: String? = null,
     val hospitalError: String? = null
 ) {
     val hasAny: Boolean
         get() = fullNameError != null ||
+            fatherNameError != null ||
+            motherNameError != null ||
             bnmcError != null ||
             phoneError != null ||
             whatsappError != null ||
             emailError != null ||
+            addressError != null ||
             hospitalError != null
 }
 
@@ -91,11 +104,13 @@ private data class RegistrationFieldErrors(
 fun RegisterScreen(
     isSignedIn: Boolean,
     signedInEmail: String = "",
+    prefillName: String = "",
+    isAdminUser: Boolean = false,
     mySubmissions: List<NurseEntity> = emptyList(),
     myTransferRequests: List<TransferRequestEntity> = emptyList(),
     onRequestTransfer: (NurseEntity) -> Unit = {},
     onGoogleAuthSuccess: () -> Unit = {},
-    onSubmitRegistration: (NurseEntity, (Result<Unit>) -> Unit) -> Unit,
+    onSubmitRegistration: (NurseEntity, Boolean, (Result<Unit>) -> Unit) -> Unit,
     onNavigateAfterSuccess: () -> Unit,
     successActionLabel: String = "View Directory",
     modifier: Modifier = Modifier
@@ -204,12 +219,17 @@ fun RegisterScreen(
         return
     }
 
-    var fullName by remember { mutableStateOf("") }
+    var selectedCategory by remember { mutableStateOf(NurseCategory.GOVT) }
+    var fullName by remember(prefillName) { mutableStateOf(prefillName) }
+    var fatherName by remember { mutableStateOf("") }
+    var motherName by remember { mutableStateOf("") }
     var bnmcNumber by remember { mutableStateOf("") }
+    var govtUid by remember { mutableStateOf("") }
     var phone by remember { mutableStateOf("") }
     var whatsappSameAsPhone by remember { mutableStateOf(true) }
     var whatsapp by remember { mutableStateOf("") }
     var email by remember(signedInEmail) { mutableStateOf(signedInEmail) }
+    var address by remember { mutableStateOf("") }
     var hospitalName by remember { mutableStateOf("") }
     var selectedDivision by remember { mutableStateOf(BangladeshData.divisions.first()) }
     var selectedDistrict by remember {
@@ -223,16 +243,20 @@ fun RegisterScreen(
         )
     }
     var selectedDesignation by remember { mutableStateOf(BangladeshData.designations.first()) }
-    var selectedQualification by remember { mutableStateOf(BangladeshData.qualifications.first()) }
+    var educations by remember {
+        mutableStateOf(listOf(EducationEntry(courseName = BangladeshData.courseNames.first())))
+    }
     var selectedSpecialty by remember { mutableStateOf(BangladeshData.specialties.first()) }
     var selectedBloodGroup by remember { mutableStateOf("O+") }
     var selectedAvailability by remember { mutableStateOf(AvailabilityStatus.ON_DUTY) }
     var experienceYearsText by remember { mutableStateOf("3") }
     var bio by remember { mutableStateOf("") }
+    var autoApproveAsAdmin by remember(isAdminUser) { mutableStateOf(isAdminUser) }
 
     var fieldErrors by remember { mutableStateOf(RegistrationFieldErrors()) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showSuccessDialog by remember { mutableStateOf(false) }
+    var lastSubmittedWasAutoApproved by remember { mutableStateOf(false) }
     var isSubmitting by remember { mutableStateOf(false) }
 
     val availableDistricts = remember(selectedDivision) {
@@ -244,15 +268,39 @@ fun RegisterScreen(
 
     fun validateFields(): RegistrationFieldErrors {
         val cleanName = fullName.trim()
+        val cleanFather = fatherName.trim()
+        val cleanMother = motherName.trim()
         val cleanBnmc = bnmcNumber.trim()
         val cleanPhone = phone.replace(Regex("[\\s\\-]"), "")
         val cleanWhatsapp = whatsapp.replace(Regex("[\\s\\-]"), "")
         val cleanEmail = email.trim()
+        val cleanAddress = address.trim()
         val cleanHospital = hospitalName.trim()
+
+        val hospitalErr = when (selectedCategory) {
+            NurseCategory.GOVT -> if (cleanHospital.length !in 3..120) {
+                "Enter Govt. hospital / working place (3–120 chars)"
+            } else null
+            NurseCategory.STUDENT -> if (cleanHospital.length !in 3..120) {
+                "Enter educational institute name (3–120 chars)"
+            } else null
+            NurseCategory.NON_GOVT -> if (cleanHospital.length > 120) {
+                "Working place must be 120 chars or less"
+            } else null
+        }
+
+        val addressErr = if (selectedCategory == NurseCategory.NON_GOVT && cleanAddress.length < 3) {
+            "Present address (ঠিকানা) is mandatory for Non-Govt."
+        } else null
 
         return RegistrationFieldErrors(
             fullNameError = if (cleanName.length !in 3..80) "Enter full name (3–80 characters)" else null,
-            bnmcError = if (cleanBnmc.length !in 4..30) "Enter valid BNMC reg. no." else null,
+            fatherNameError = if (cleanFather.length !in 2..80) "Enter father's name" else null,
+            motherNameError = if (cleanMother.length !in 2..80) "Enter mother's name" else null,
+            bnmcError = if (cleanBnmc.length !in 4..30) {
+                if (selectedCategory == NurseCategory.STUDENT) "Enter valid Student Reg. No."
+                else "Enter valid BNMC Reg. No."
+            } else null,
             phoneError = if (!SecurityUtils.isValidBangladeshPhone(cleanPhone)) "Enter valid BD mobile (01XXXXXXXXX)" else null,
             whatsappError = if (!whatsappSameAsPhone && !SecurityUtils.isValidBangladeshPhone(cleanWhatsapp)) {
                 "Enter valid BD WhatsApp number"
@@ -260,7 +308,8 @@ fun RegisterScreen(
             emailError = if (cleanEmail.isNotEmpty() && (!SecurityUtils.isValidEmail(cleanEmail) || cleanEmail.length > 120)) {
                 "Enter a valid email address"
             } else null,
-            hospitalError = if (cleanHospital.length !in 3..120) "Enter hospital or workplace name" else null
+            addressError = addressErr,
+            hospitalError = hospitalErr
         )
     }
 
@@ -317,7 +366,7 @@ fun RegisterScreen(
             }
 
             if (mySubmissions.isNotEmpty() || myTransferRequests.isNotEmpty()) {
-                SectionCard(title = "My Profiles & Hospital Transfer (বদলি আবেদন)") {
+                SectionCard(title = "My Profiles & Transfer (প্রোফাইল ও বদলি আবেদন)") {
                     mySubmissions.forEach { profile ->
                         val hasPendingTransfer = myTransferRequests.any {
                             it.nurseId == profile.id && it.statusEnum == TransferStatus.PENDING
@@ -345,10 +394,37 @@ fun RegisterScreen(
                                             fontWeight = FontWeight.Bold
                                         )
                                         Text(
-                                            text = "${profile.hospitalName} • ${profile.district}",
+                                            text = "${profile.categoryEnum.shortLabel} • ${profile.hospitalName.ifBlank { profile.address.ifBlank { profile.district } }} • ${profile.district}",
                                             style = MaterialTheme.typography.bodySmall,
                                             color = MaterialTheme.colorScheme.onSurfaceVariant
                                         )
+                                        FlowRow(
+                                            horizontalArrangement = Arrangement.spacedBy(6.dp),
+                                            verticalArrangement = Arrangement.spacedBy(2.dp)
+                                        ) {
+                                            Text(
+                                                text = "${profile.registrationNumberLabel}: ${profile.bnmcNumber}",
+                                                style = MaterialTheme.typography.labelSmall,
+                                                color = MaterialTheme.colorScheme.primary
+                                            )
+                                            if (profile.approvalEnum == ApprovalStatus.APPROVED) {
+                                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                                    Icon(
+                                                        imageVector = Icons.Filled.Verified,
+                                                        contentDescription = "Verified",
+                                                        tint = StatusApproved,
+                                                        modifier = Modifier.size(13.dp)
+                                                    )
+                                                    Spacer(Modifier.width(3.dp))
+                                                    Text(
+                                                        text = "Verified",
+                                                        style = MaterialTheme.typography.labelSmall,
+                                                        fontWeight = FontWeight.Bold,
+                                                        color = StatusApproved
+                                                    )
+                                                }
+                                            }
+                                        }
                                     }
                                     val statusColor = when (profile.approvalEnum) {
                                         ApprovalStatus.APPROVED -> StatusApproved
@@ -386,7 +462,13 @@ fun RegisterScreen(
                                         ) {
                                             Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
                                             Spacer(Modifier.width(6.dp))
-                                            Text("Request Hospital Transfer (বদলি আবেদন)")
+                                            Text(
+                                                if (profile.categoryEnum == NurseCategory.NON_GOVT) {
+                                                    "Transfer to Govt. Service / New Workplace (বদলি)"
+                                                } else {
+                                                    "Request Hospital Transfer (বদলি আবেদন)"
+                                                }
+                                            )
                                         }
                                     }
                                 } else if (profile.approvalEnum == ApprovalStatus.REJECTED && profile.rejectionReason.isNotBlank()) {
@@ -448,7 +530,7 @@ fun RegisterScreen(
                                         }
                                     }
                                     Text(
-                                        text = "${req.currentHospitalName} ➔ ${req.newHospitalName}",
+                                        text = "${req.currentHospitalName.ifBlank { req.currentCategoryEnum.shortLabel }} ➔ ${req.newHospitalName} (${req.newCategoryEnum.shortLabel})",
                                         style = MaterialTheme.typography.bodySmall,
                                         fontWeight = FontWeight.Medium
                                     )
@@ -488,7 +570,35 @@ fun RegisterScreen(
                 }
             }
 
-            SectionCard(title = "Personal & BNMC Credentials") {
+            SectionCard(title = "Category & Personal Credentials") {
+                Text(
+                    text = "Select Category * (ক্যাটাগরি নির্বাচন করুন)",
+                    style = MaterialTheme.typography.labelLarge,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+                FlowRow(
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    NurseCategory.entries.forEach { cat ->
+                        FilterChip(
+                            selected = selectedCategory == cat,
+                            onClick = {
+                                selectedCategory = cat
+                                fieldErrors = fieldErrors.copy(hospitalError = null, addressError = null, bnmcError = null)
+                                errorMessage = null
+                                if (cat == NurseCategory.STUDENT && !selectedDesignation.startsWith("Student", ignoreCase = true)) {
+                                    selectedDesignation = "Student Nurse"
+                                } else if (cat != NurseCategory.STUDENT && selectedDesignation.startsWith("Student", ignoreCase = true)) {
+                                    selectedDesignation = "Senior Staff Nurse"
+                                }
+                            },
+                            label = { Text(cat.label) },
+                            modifier = Modifier.testTag("reg_category_${cat.name.lowercase()}")
+                        )
+                    }
+                }
+
                 OutlinedTextField(
                     value = fullName,
                     onValueChange = {
@@ -496,7 +606,7 @@ fun RegisterScreen(
                         fieldErrors = fieldErrors.copy(fullNameError = null)
                         errorMessage = null
                     },
-                    label = { Text("Full Name *") },
+                    label = { Text("Name (Full Name) *") },
                     placeholder = { Text("e.g., Nusrat Jahan") },
                     leadingIcon = { Icon(Icons.Filled.Person, contentDescription = null) },
                     isError = fieldErrors.fullNameError != null,
@@ -508,14 +618,60 @@ fun RegisterScreen(
                 )
 
                 OutlinedTextField(
+                    value = fatherName,
+                    onValueChange = {
+                        fatherName = it.take(80)
+                        fieldErrors = fieldErrors.copy(fatherNameError = null)
+                        errorMessage = null
+                    },
+                    label = { Text("Father's Name *") },
+                    placeholder = { Text("পিতার নাম লিখুন") },
+                    leadingIcon = { Icon(Icons.Filled.FamilyRestroom, contentDescription = null) },
+                    isError = fieldErrors.fatherNameError != null,
+                    supportingText = fieldErrors.fatherNameError?.let { err -> { Text(err) } },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("reg_father_name")
+                )
+
+                OutlinedTextField(
+                    value = motherName,
+                    onValueChange = {
+                        motherName = it.take(80)
+                        fieldErrors = fieldErrors.copy(motherNameError = null)
+                        errorMessage = null
+                    },
+                    label = { Text("Mother's Name *") },
+                    placeholder = { Text("মাতার নাম লিখুন") },
+                    leadingIcon = { Icon(Icons.Filled.FamilyRestroom, contentDescription = null) },
+                    isError = fieldErrors.motherNameError != null,
+                    supportingText = fieldErrors.motherNameError?.let { err -> { Text(err) } },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("reg_mother_name")
+                )
+
+                OutlinedTextField(
                     value = bnmcNumber,
                     onValueChange = {
                         bnmcNumber = it
                         fieldErrors = fieldErrors.copy(bnmcError = null)
                         errorMessage = null
                     },
-                    label = { Text("BNMC Registration No. *") },
-                    placeholder = { Text("e.g., BNMC-48920") },
+                    label = {
+                        Text(
+                            if (selectedCategory == NurseCategory.STUDENT) "Student Registration No. *"
+                            else "BNMC Registration No. *"
+                        )
+                    },
+                    placeholder = {
+                        Text(
+                            if (selectedCategory == NurseCategory.STUDENT) "e.g., STU-2025-1042"
+                            else "e.g., BNMC-48920"
+                        )
+                    },
                     leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
                     isError = fieldErrors.bnmcError != null,
                     supportingText = fieldErrors.bnmcError?.let { err -> { Text(err) } },
@@ -524,6 +680,28 @@ fun RegisterScreen(
                         .fillMaxWidth()
                         .testTag("reg_bnmc")
                 )
+
+                if (selectedCategory != NurseCategory.STUDENT) {
+                    OutlinedTextField(
+                        value = govtUid,
+                        onValueChange = { govtUid = it.take(40) },
+                        label = {
+                            Text(
+                                if (selectedCategory == NurseCategory.GOVT) {
+                                    "Govt. UID (For Govt. Job Holders / চাকরিজীবী)"
+                                } else {
+                                    "Govt. UID (If Employed / Optional)"
+                                }
+                            )
+                        },
+                        placeholder = { Text("e.g., 199512345678") },
+                        leadingIcon = { Icon(Icons.Filled.Badge, contentDescription = null) },
+                        singleLine = true,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("reg_govt_uid")
+                    )
+                }
 
                 Row(
                     modifier = Modifier.fillMaxWidth(),
@@ -620,7 +798,7 @@ fun RegisterScreen(
                 )
             }
 
-            SectionCard(title = "Workplace & Bangladesh Location") {
+            SectionCard(title = "Location, Workplace & Education") {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -659,15 +837,63 @@ fun RegisterScreen(
                 )
 
                 OutlinedTextField(
+                    value = address,
+                    onValueChange = {
+                        address = it.take(200)
+                        fieldErrors = fieldErrors.copy(addressError = null)
+                        errorMessage = null
+                    },
+                    label = {
+                        Text(
+                            if (selectedCategory == NurseCategory.NON_GOVT) {
+                                "Present Address (ঠিকানা) *"
+                            } else {
+                                "Present Address (ঠিকানা / Optional)"
+                            }
+                        )
+                    },
+                    placeholder = { Text("House, Road, Village / Ward, Post Office") },
+                    leadingIcon = { Icon(Icons.Filled.Home, contentDescription = null) },
+                    isError = fieldErrors.addressError != null,
+                    supportingText = fieldErrors.addressError?.let { err -> { Text(err) } },
+                    singleLine = true,
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("reg_address")
+                )
+
+                OutlinedTextField(
                     value = hospitalName,
                     onValueChange = {
                         hospitalName = it
                         fieldErrors = fieldErrors.copy(hospitalError = null)
                         errorMessage = null
                     },
-                    label = { Text("Hospital / Clinic / Institution *") },
-                    placeholder = { Text("e.g., Dhaka Medical College Hospital") },
-                    leadingIcon = { Icon(Icons.Filled.LocalHospital, contentDescription = null) },
+                    label = {
+                        Text(
+                            when (selectedCategory) {
+                                NurseCategory.GOVT -> "Working Place / Govt. Hospital *"
+                                NurseCategory.NON_GOVT -> "Working Place / Clinic (Optional)"
+                                NurseCategory.STUDENT -> "Educational Institute (শিক্ষাপ্রতিষ্ঠান) *"
+                            }
+                        )
+                    },
+                    placeholder = {
+                        Text(
+                            when (selectedCategory) {
+                                NurseCategory.GOVT -> "e.g., Dhaka Medical College Hospital"
+                                NurseCategory.NON_GOVT -> "e.g., Square Hospital / Leave blank if unemployed"
+                                NurseCategory.STUDENT -> "e.g., Dhaka Nursing College"
+                            }
+                        )
+                    },
+                    leadingIcon = {
+                        Icon(
+                            if (selectedCategory == NurseCategory.STUDENT) Icons.Filled.School
+                            else Icons.Filled.LocalHospital,
+                            contentDescription = null
+                        )
+                    },
                     isError = fieldErrors.hospitalError != null,
                     supportingText = fieldErrors.hospitalError?.let { err -> { Text(err) } },
                     singleLine = true,
@@ -684,12 +910,9 @@ fun RegisterScreen(
                     modifier = Modifier.fillMaxWidth()
                 )
 
-                FormDropdownField(
-                    label = "Qualification",
-                    selected = selectedQualification,
-                    options = BangladeshData.qualifications,
-                    onSelect = { selectedQualification = it },
-                    modifier = Modifier.fillMaxWidth()
+                EducationInputSection(
+                    educations = educations,
+                    onEducationsChange = { educations = it }
                 )
 
                 FormDropdownField(
@@ -754,6 +977,40 @@ fun RegisterScreen(
                 )
             }
 
+            if (isAdminUser) {
+                Surface(
+                    shape = MaterialTheme.shapes.medium,
+                    color = MaterialTheme.colorScheme.secondaryContainer.copy(alpha = 0.7f),
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 14.dp, vertical = 10.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            Text(
+                                text = "Publish Immediately as Regular Nurse",
+                                style = MaterialTheme.typography.labelLarge,
+                                fontWeight = FontWeight.Bold
+                            )
+                            Text(
+                                text = "অ্যাডমিন হিসেবে সাধারণ নার্স ডিরেক্টরিতে সরাসরি যুক্ত করুন",
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onSecondaryContainer
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Switch(
+                            checked = autoApproveAsAdmin,
+                            onCheckedChange = { autoApproveAsAdmin = it }
+                        )
+                    }
+                }
+            }
+
             Button(
                 onClick = {
                     val errors = validateFields()
@@ -762,18 +1019,28 @@ fun RegisterScreen(
                         errorMessage = "Please fix the highlighted fields before submitting."
                         return@Button
                     }
+                    val validEducations = educations.filter { it.courseName.isNotBlank() }
+                    if (validEducations.isEmpty()) {
+                        errorMessage = "Select at least one educational qualification course."
+                        return@Button
+                    }
 
                     isSubmitting = true
                     errorMessage = null
-                    val entity = NurseEntity(
+                    val draft = NurseEntity(
                         fullName = fullName,
+                        fatherName = fatherName,
+                        motherName = motherName,
+                        nurseCategory = selectedCategory.name,
                         bnmcNumber = bnmcNumber,
+                        govtUid = if (selectedCategory == NurseCategory.STUDENT) "" else govtUid,
                         designation = selectedDesignation,
-                        qualification = selectedQualification,
+                        educations = validEducations,
                         specialty = selectedSpecialty,
                         division = selectedDivision,
                         district = selectedDistrict,
                         upazila = selectedUpazila,
+                        address = address,
                         hospitalName = hospitalName,
                         phone = phone,
                         whatsapp = if (whatsappSameAsPhone) phone else whatsapp,
@@ -782,16 +1049,32 @@ fun RegisterScreen(
                         availabilityStatus = selectedAvailability.name,
                         experienceYears = (experienceYearsText.toIntOrNull() ?: 1).coerceIn(0, 60),
                         bio = bio.trim(),
-                        approvalStatus = ApprovalStatus.PENDING.name
+                        approvalStatus = if (isAdminUser && autoApproveAsAdmin) {
+                            ApprovalStatus.APPROVED.name
+                        } else {
+                            ApprovalStatus.PENDING.name
+                        }
                     )
-                    onSubmitRegistration(entity) { result ->
+                    val entity = draft.copy(
+                        qualification = draft.educationSummaryText()
+                            .ifBlank { validEducations.first().courseName }
+                            .take(200)
+                    )
+                    val shouldAutoApprove = isAdminUser && autoApproveAsAdmin
+                    onSubmitRegistration(entity, shouldAutoApprove) { result ->
                         isSubmitting = false
                         result.onSuccess {
+                            lastSubmittedWasAutoApproved = shouldAutoApprove
                             fullName = ""
+                            fatherName = ""
+                            motherName = ""
                             bnmcNumber = ""
+                            govtUid = ""
                             phone = ""
                             whatsapp = ""
+                            address = ""
                             hospitalName = ""
+                            educations = listOf(EducationEntry(courseName = BangladeshData.courseNames.first()))
                             bio = ""
                             fieldErrors = RegistrationFieldErrors()
                             showSuccessDialog = true
@@ -808,7 +1091,11 @@ fun RegisterScreen(
                 shape = RoundedCornerShape(16.dp)
             ) {
                 Text(
-                    text = if (isSubmitting) "Submitting to Cloud..." else "Submit for Admin Approval",
+                    text = when {
+                        isSubmitting -> "Submitting to Cloud..."
+                        isAdminUser && autoApproveAsAdmin -> "Publish Profile to Nurse Directory"
+                        else -> "Submit for Admin Approval"
+                    },
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.Bold
                 )
@@ -829,10 +1116,19 @@ fun RegisterScreen(
                     modifier = Modifier.size(40.dp)
                 )
             },
-            title = { Text("Registration Submitted!") },
+            title = {
+                Text(
+                    if (lastSubmittedWasAutoApproved) "Profile Published!"
+                    else "Registration Submitted!"
+                )
+            },
             text = {
                 Text(
-                    "আপনার নিবন্ধন সফলভাবে লাইভ Cloud Firestore-এ জমা হয়েছে (Status: Pending)। অ্যাডমিন অনুমোদনের পর ডিরেক্টরিতে আপনার প্রোফাইল প্রকাশিত হবে।"
+                    if (lastSubmittedWasAutoApproved) {
+                        "প্রোফাইলটি সফলভাবে অনুমোদিত ও সাধারণ নার্স ডিরেক্টরিতে প্রকাশিত হয়েছে।"
+                    } else {
+                        "আপনার নিবন্ধন সফলভাবে লাইভ Cloud Firestore-এ জমা হয়েছে (Status: Pending)। অ্যাডমিন অনুমোদনের পর ডিরেক্টরিতে আপনার প্রোফাইল প্রকাশিত হবে।"
+                    }
                 )
             },
             confirmButton = {
