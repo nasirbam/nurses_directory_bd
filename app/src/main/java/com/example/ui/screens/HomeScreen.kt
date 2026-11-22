@@ -60,6 +60,7 @@ import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
 import com.example.R
 
 @Composable
@@ -191,7 +192,7 @@ fun HomeScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "Bangladesh Nursing Portal",
+                            text = "Bangladesh Nursing Portal • v${BuildConfig.VERSION_NAME}",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFFD2F5EC)
                         )

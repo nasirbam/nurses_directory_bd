@@ -65,8 +65,10 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 
-private const val REGISTERED_DEBUG_SHA1 =
-    "BD:BB:D4:A4:A6:3A:2E:CF:06:3F:69:EA:AC:F2:F8:A4:0F:CE:E1:2D"
+private val KNOWN_REGISTERED_SHA1S = setOf(
+    "BD:BB:D4:A4:A6:3A:2E:CF:06:3F:69:EA:AC:F2:F8:A4:0F:CE:E1:2D",
+    "AF:4D:EA:3D:D5:79:59:00:C5:54:3A:E8:F4:C1:F4:FD:8C:7E:BD:EB"
+)
 
 internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     val listener = FirebaseAuth.AuthStateListener { auth ->
@@ -217,8 +219,8 @@ fun onGoogleSignInClicked(
                 e
             )
             val cancelMsg = when {
-                installedSha1 != null && !installedSha1.equals(REGISTERED_DEBUG_SHA1, ignoreCase = true) ->
-                    "এই APK-টি Release Key দিয়ে সাইন করা, যার SHA-1 Firebase-এ যুক্ত নেই!\n" +
+                installedSha1 != null && KNOWN_REGISTERED_SHA1S.none { it.equals(installedSha1, ignoreCase = true) } ->
+                    "এই APK-টি এমন Key দিয়ে সাইন করা যার SHA-1 Firebase-এ যুক্ত নেই!\n" +
                         "ফোনের APK SHA-1:\n$installedSha1\n\n" +
                         "সমাধান: Firebase Console → Project Settings → com.aistudio.nursesbd.xkpqrm-এ এই SHA-1 যোগ করুন অথবা GitHub Releases থেকে Debug APK ডাউনলোড করুন।"
                 installedSha1 != null ->
