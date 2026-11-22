@@ -153,6 +153,29 @@ service cloud.firestore {
              data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
 
+    function isValidDirectoryConfig(data) {
+      return data.extraDesignations is list && data.extraDesignations.size() <= 40 &&
+             data.extraCourseNames is list && data.extraCourseNames.size() <= 40 &&
+             data.extraSpecialties is list && data.extraSpecialties.size() <= 40 &&
+             data.updatedBy is string && data.updatedBy.size() >= 2 && data.updatedBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidAppRelease(data) {
+      return data.latestVersionCode is int && data.latestVersionCode >= 1 && data.latestVersionCode <= 99999 &&
+             data.latestVersionName is string && data.latestVersionName.size() >= 1 && data.latestVersionName.size() <= 20 &&
+             data.releaseNotes is string && data.releaseNotes.size() <= 400 &&
+             data.apkDownloadUrl is string && data.apkDownloadUrl.size() <= 300 &&
+             (data.apkDownloadUrl == '' || data.apkDownloadUrl.matches('^https://.*')) &&
+             data.webPortalUrl is string && data.webPortalUrl.size() <= 300 &&
+             (data.webPortalUrl == '' || data.webPortalUrl.matches('^https://.*')) &&
+             data.active is bool &&
+             data.updatedBy is string && data.updatedBy.size() >= 2 && data.updatedBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
     // 4. Admins Collection Rules
     match /admins/{adminEmail} {
       allow get: if hasVerifiedEmail() && isValidEmailId(adminEmail) && (
@@ -319,27 +342,59 @@ service cloud.firestore {
       );
     }
 
-    // 7. Live Remote Config & Broadcast Notice
+    // 7. Live Remote Config, Broadcast Notice, Dynamic Options & App Release
     match /app_config/{configId} {
       allow get, list: if isSignedIn();
 
-      allow create: if isSignedIn() &&
-                       configId == 'live_notice' &&
-                       isAdmin() &&
-                       incoming().keys().hasAll(['title', 'message', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
-                       incoming().keys().hasOnly(['title', 'message', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
-                       isValidLiveNotice(incoming());
+      allow create: if isSignedIn() && isAdmin() && (
+        (
+          configId == 'live_notice' &&
+          incoming().keys().hasAll(['title', 'message', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['title', 'message', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
+          isValidLiveNotice(incoming())
+        ) ||
+        (
+          configId == 'directory_config' &&
+          incoming().keys().hasAll(['extraDesignations', 'extraCourseNames', 'extraSpecialties', 'updatedBy', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['extraDesignations', 'extraCourseNames', 'extraSpecialties', 'updatedBy', 'createdAt', 'updatedAt']) &&
+          isValidDirectoryConfig(incoming())
+        ) ||
+        (
+          configId == 'app_release' &&
+          incoming().keys().hasAll(['latestVersionCode', 'latestVersionName', 'releaseNotes', 'apkDownloadUrl', 'webPortalUrl', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
+          incoming().keys().hasOnly(['latestVersionCode', 'latestVersionName', 'releaseNotes', 'apkDownloadUrl', 'webPortalUrl', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
+          isValidAppRelease(incoming())
+        )
+      );
 
-      allow update: if isSignedIn() &&
-                       configId == 'live_notice' &&
-                       isAdmin() &&
-                       isValidLiveNotice(incoming()) &&
-                       incoming().createdAt == existing().createdAt &&
-                       incoming().diff(existing()).affectedKeys().hasOnly([
-                         'title', 'message', 'active', 'updatedBy', 'updatedAt'
-                       ]);
+      allow update: if isSignedIn() && isAdmin() &&
+                       incoming().createdAt == existing().createdAt && (
+        (
+          configId == 'live_notice' &&
+          isValidLiveNotice(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'title', 'message', 'active', 'updatedBy', 'updatedAt'
+          ])
+        ) ||
+        (
+          configId == 'directory_config' &&
+          isValidDirectoryConfig(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'extraDesignations', 'extraCourseNames', 'extraSpecialties', 'updatedBy', 'updatedAt'
+          ])
+        ) ||
+        (
+          configId == 'app_release' &&
+          isValidAppRelease(incoming()) &&
+          incoming().diff(existing()).affectedKeys().hasOnly([
+            'latestVersionCode', 'latestVersionName', 'releaseNotes', 'apkDownloadUrl', 'webPortalUrl', 'active', 'updatedBy', 'updatedAt'
+          ])
+        )
+      );
 
-      allow delete: if isSignedIn() && configId == 'live_notice' && isAdmin();
+      allow delete: if isSignedIn() &&
+                       isAdmin() &&
+                       configId in ['live_notice', 'directory_config', 'app_release'];
     }
   }
 }

@@ -23,6 +23,7 @@ import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudSync
 import androidx.compose.material.icons.filled.DeleteOutline
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
@@ -35,6 +36,7 @@ import androidx.compose.material.icons.filled.Print
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
 import androidx.compose.material.icons.filled.SwapHoriz
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
@@ -73,8 +75,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.data.AdminEntity
 import com.example.data.AdminRole
+import com.example.data.AppReleaseEntity
 import com.example.data.ApprovalStatus
 import com.example.data.BangladeshData
+import com.example.data.DirectoryConfigEntity
 import com.example.data.LiveNoticeEntity
 import com.example.data.NurseEntity
 import com.example.data.TransferRequestEntity
@@ -83,7 +87,9 @@ import com.example.ui.AdminSessionState
 import com.example.ui.AnalyticsSummary
 import com.example.ui.components.ApprovalFunnelCard
 import com.example.ui.components.DivisionBarChartCard
+import com.example.ui.components.ManageLiveDirectoryConfigDialog
 import com.example.ui.components.PrintReportDialog
+import com.example.ui.components.PublishAppReleaseDialog
 import com.example.ui.components.PublishLiveNoticeDialog
 import com.example.ui.components.SpecialtyDonutChartCard
 import com.example.ui.theme.StatusApproved
@@ -98,6 +104,8 @@ fun AdminScreen(
     allNurses: List<NurseEntity>,
     transferRequests: List<TransferRequestEntity> = emptyList(),
     liveNotice: LiveNoticeEntity? = null,
+    directoryConfig: DirectoryConfigEntity = DirectoryConfigEntity(),
+    appRelease: AppReleaseEntity? = null,
     hasOwnNurseProfile: Boolean = true,
     onRegisterSelfAsNurse: () -> Unit = {},
     onSignOutAndSwitch: () -> Unit,
@@ -108,6 +116,8 @@ fun AdminScreen(
     onApproveTransfer: (TransferRequestEntity, (Result<Unit>) -> Unit) -> Unit = { _, cb -> cb(Result.success(Unit)) },
     onRejectTransfer: (TransferRequestEntity, String, (Result<Unit>) -> Unit) -> Unit = { _, _, cb -> cb(Result.success(Unit)) },
     onPublishLiveNotice: (String, String, Boolean, (Result<Unit>) -> Unit) -> Unit = { _, _, _, cb -> cb(Result.success(Unit)) },
+    onSaveDirectoryConfig: (List<String>, List<String>, List<String>, (Result<Unit>) -> Unit) -> Unit = { _, _, _, cb -> cb(Result.success(Unit)) },
+    onPublishAppRelease: (Int, String, String, String, String, Boolean, (Result<Unit>) -> Unit) -> Unit = { _, _, _, _, _, _, cb -> cb(Result.success(Unit)) },
     onAddAdmin: (String, String, AdminRole, String, (Result<Unit>) -> Unit) -> Unit,
     onRemoveAdmin: (AdminEntity, (Result<Unit>) -> Unit) -> Unit,
     onShowMessage: (String) -> Unit,
@@ -133,6 +143,8 @@ fun AdminScreen(
     var transferToReject by remember { mutableStateOf<TransferRequestEntity?>(null) }
     var showAddAdminDialog by remember { mutableStateOf(false) }
     var showLiveNoticeDialog by remember { mutableStateOf(false) }
+    var showLiveConfigDialog by remember { mutableStateOf(false) }
+    var showAppReleaseDialog by remember { mutableStateOf(false) }
     var showPrintReportDialog by remember { mutableStateOf(false) }
     var adminToRemove by remember { mutableStateOf<AdminEntity?>(null) }
 
@@ -276,7 +288,11 @@ fun AdminScreen(
                     transferFilter = TransferStatus.PENDING
                     selectedTab = 2
                 },
-                onOpenLiveNotice = { showLiveNoticeDialog = true }
+                onOpenLiveNotice = { showLiveNoticeDialog = true },
+                onOpenLiveDirectoryConfig = { showLiveConfigDialog = true },
+                onOpenAppRelease = { showAppReleaseDialog = true },
+                directoryConfig = directoryConfig,
+                appRelease = appRelease
             )
             1 -> ApprovalsQueueTab(
                 allNurses = allNurses,
@@ -473,6 +489,43 @@ fun AdminScreen(
         )
     }
 
+    if (showLiveConfigDialog) {
+        ManageLiveDirectoryConfigDialog(
+            currentConfig = directoryConfig,
+            onDismiss = { showLiveConfigDialog = false },
+            onSave = { desig, courses, specs, onError ->
+                onSaveDirectoryConfig(desig, courses, specs) { res ->
+                    res.onSuccess {
+                        showLiveConfigDialog = false
+                        onShowMessage("Live designations, courses & specialties synced to all phones!")
+                    }.onFailure { err ->
+                        onError(err.message ?: "Could not sync live directory options")
+                    }
+                }
+            }
+        )
+    }
+
+    if (showAppReleaseDialog) {
+        PublishAppReleaseDialog(
+            currentRelease = appRelease,
+            onDismiss = { showAppReleaseDialog = false },
+            onPublish = { code, name, notes, apkUrl, webUrl, active, onError ->
+                onPublishAppRelease(code, name, notes, apkUrl, webUrl, active) { res ->
+                    res.onSuccess {
+                        showAppReleaseDialog = false
+                        onShowMessage(
+                            if (active) "App update alert v$name published live!"
+                            else "App release alert saved (inactive)"
+                        )
+                    }.onFailure { err ->
+                        onError(err.message ?: "Could not publish app release info")
+                    }
+                }
+            }
+        )
+    }
+
     if (showPrintReportDialog) {
         PrintReportDialog(
             activeAdmin = activeAdmin,
@@ -532,6 +585,10 @@ fun AdminDashboardScreen(
     onOpenApprovedEdit: () -> Unit = {},
     onOpenTransfers: () -> Unit = {},
     onOpenLiveNotice: () -> Unit = {},
+    onOpenLiveDirectoryConfig: () -> Unit = {},
+    onOpenAppRelease: () -> Unit = {},
+    directoryConfig: DirectoryConfigEntity = DirectoryConfigEntity(),
+    appRelease: AppReleaseEntity? = null,
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -640,6 +697,63 @@ fun AdminDashboardScreen(
                         Icon(Icons.Filled.Campaign, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
                         Text("Broadcast")
+                    }
+                }
+            }
+        }
+
+        item {
+            val extraCount = directoryConfig.extraDesignations.size +
+                directoryConfig.extraCourseNames.size +
+                directoryConfig.extraSpecialties.size
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.surfaceContainerHigh
+                )
+            ) {
+                Column(
+                    modifier = Modifier.padding(14.dp),
+                    verticalArrangement = Arrangement.spacedBy(10.dp)
+                ) {
+                    Text(
+                        text = "Auto-Update & Live Sync Controls",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = "ডাউনলোড ছাড়াই নতুন কোর্স/পদবি/স্পেশালিটি আপডেট করুন ($extraCount custom) অথবা নতুন APK / ওয়েব লিংক পাবলিশ করুন।",
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                    )
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = onOpenLiveDirectoryConfig,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("admin_live_options_button")
+                        ) {
+                            Icon(Icons.Filled.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Live Options")
+                        }
+                        OutlinedButton(
+                            onClick = onOpenAppRelease,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("admin_app_release_button")
+                        ) {
+                            Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text(
+                                if (appRelease?.active == true) "v${appRelease.latestVersionName} Alert"
+                                else "App Release"
+                            )
+                        }
                     }
                 }
             }

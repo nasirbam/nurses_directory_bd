@@ -38,10 +38,12 @@ fun EducationInputSection(
     educations: List<EducationEntry>,
     onEducationsChange: (List<EducationEntry>) -> Unit,
     modifier: Modifier = Modifier,
+    courseOptionsList: List<String> = BangladeshData.courseNames,
     maxEntries: Int = 10
 ) {
+    val safeCourseBase = courseOptionsList.ifEmpty { BangladeshData.courseNames }
     val entries = educations.ifEmpty {
-        listOf(EducationEntry(courseName = BangladeshData.courseNames.first()))
+        listOf(EducationEntry(courseName = safeCourseBase.first()))
     }
 
     Column(
@@ -108,12 +110,12 @@ fun EducationInputSection(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
-                        val courseOptions = (BangladeshData.courseNames + entry.courseName)
+                        val courseOptions = (safeCourseBase + entry.courseName)
                             .filter { it.isNotBlank() }
                             .distinct()
                         FormDropdownField(
                             label = "Course Name *",
-                            selected = entry.courseName.ifBlank { BangladeshData.courseNames.first() },
+                            selected = entry.courseName.ifBlank { safeCourseBase.first() },
                             options = courseOptions,
                             onSelect = { selectedCourse ->
                                 val next = entries.toMutableList()
@@ -183,7 +185,7 @@ fun EducationInputSection(
         if (entries.size < maxEntries) {
             OutlinedButton(
                 onClick = {
-                    val next = entries + EducationEntry(courseName = BangladeshData.courseNames.first())
+                    val next = entries + EducationEntry(courseName = safeCourseBase.first())
                     onEducationsChange(next)
                 },
                 modifier = Modifier

@@ -6,9 +6,11 @@ import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewModelScope
 import com.example.data.AdminEntity
 import com.example.data.AdminRole
+import com.example.data.AppReleaseEntity
 import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.DirectoryConfigEntity
 import com.example.data.LiveNoticeEntity
 import com.example.data.NurseCategory
 import com.example.data.NurseEntity
@@ -229,6 +231,24 @@ class NursesViewModel(
                 initialValue = UiState.Loading
             )
 
+    private val directoryConfigState: StateFlow<UiState<DirectoryConfigEntity?>> =
+        repository.observeDirectoryConfig()
+            .toSafeUiStateFlow("Failed to load live directory configuration")
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = UiState.Loading
+            )
+
+    private val appReleaseState: StateFlow<UiState<AppReleaseEntity?>> =
+        repository.observeAppRelease()
+            .toSafeUiStateFlow("Failed to check app release info")
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = UiState.Loading
+            )
+
     val adminSessionState: StateFlow<AdminSessionState> = combine(
         myAdminDocState,
         adminListState
@@ -304,6 +324,14 @@ class NursesViewModel(
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
 
     val liveNotice: StateFlow<LiveNoticeEntity?> = liveNoticeState.map { state ->
+        (state as? UiState.Success)?.data
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
+
+    val directoryConfig: StateFlow<DirectoryConfigEntity> = directoryConfigState.map { state ->
+        (state as? UiState.Success)?.data ?: DirectoryConfigEntity()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), DirectoryConfigEntity())
+
+    val appRelease: StateFlow<AppReleaseEntity?> = appReleaseState.map { state ->
         (state as? UiState.Success)?.data
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
@@ -728,6 +756,56 @@ class NursesViewModel(
         }
         viewModelScope.launch {
             val result = repository.publishLiveNotice(title, message, active, adminEmail)
+            onResult(result)
+        }
+    }
+
+    fun saveDirectoryConfig(
+        extraDesignations: List<String>,
+        extraCourseNames: List<String>,
+        extraSpecialties: List<String>,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        val adminEmail = adminSessionState.value.currentAdmin?.email ?: normalizedUserEmail
+        if (adminEmail.isBlank()) {
+            onResult(Result.failure(IllegalStateException("Admin session required.")))
+            return
+        }
+        viewModelScope.launch {
+            val result = repository.saveDirectoryConfig(
+                extraDesignations = extraDesignations,
+                extraCourseNames = extraCourseNames,
+                extraSpecialties = extraSpecialties,
+                adminEmail = adminEmail
+            )
+            onResult(result)
+        }
+    }
+
+    fun publishAppRelease(
+        latestVersionCode: Int,
+        latestVersionName: String,
+        releaseNotes: String,
+        apkDownloadUrl: String,
+        webPortalUrl: String,
+        active: Boolean,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        val adminEmail = adminSessionState.value.currentAdmin?.email ?: normalizedUserEmail
+        if (adminEmail.isBlank()) {
+            onResult(Result.failure(IllegalStateException("Admin session required.")))
+            return
+        }
+        viewModelScope.launch {
+            val result = repository.publishAppRelease(
+                latestVersionCode = latestVersionCode,
+                latestVersionName = latestVersionName,
+                releaseNotes = releaseNotes,
+                apkDownloadUrl = apkDownloadUrl,
+                webPortalUrl = webPortalUrl,
+                active = active,
+                adminEmail = adminEmail
+            )
             onResult(result)
         }
     }

@@ -417,6 +417,66 @@ class NursesRepository(
         )
     }
 
+    fun observeDirectoryConfig(): Flow<DirectoryConfigEntity?> = flow {
+        val uid = requireUserId()
+        val path = "app_config/directory_config"
+        emitAll(
+            db.collection("app_config").document("directory_config")
+                .snapshots()
+                .map { snapshot ->
+                    if (snapshot.exists()) {
+                        snapshot.toObject(
+                            DirectoryConfigEntity::class.java,
+                            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                        )
+                    } else {
+                        null
+                    }
+                }
+                .catch { error ->
+                    val firestoreError = generateSequence(error) { it.cause }
+                        .filterIsInstance<FirebaseFirestoreException>()
+                        .firstOrNull()
+                    if (firestoreError == null && error is CancellationException) throw error
+                    val exceptionToLog = firestoreError ?: (error as? Exception)
+                    if (exceptionToLog != null && auth.currentUser?.uid == uid) {
+                        handleFirestoreError(exceptionToLog, OperationType.GET, path)
+                    }
+                    throw error
+                }
+        )
+    }
+
+    fun observeAppRelease(): Flow<AppReleaseEntity?> = flow {
+        val uid = requireUserId()
+        val path = "app_config/app_release"
+        emitAll(
+            db.collection("app_config").document("app_release")
+                .snapshots()
+                .map { snapshot ->
+                    if (snapshot.exists()) {
+                        snapshot.toObject(
+                            AppReleaseEntity::class.java,
+                            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                        )
+                    } else {
+                        null
+                    }
+                }
+                .catch { error ->
+                    val firestoreError = generateSequence(error) { it.cause }
+                        .filterIsInstance<FirebaseFirestoreException>()
+                        .firstOrNull()
+                    if (firestoreError == null && error is CancellationException) throw error
+                    val exceptionToLog = firestoreError ?: (error as? Exception)
+                    if (exceptionToLog != null && auth.currentUser?.uid == uid) {
+                        handleFirestoreError(exceptionToLog, OperationType.GET, path)
+                    }
+                    throw error
+                }
+        )
+    }
+
     suspend fun approveNurse(nurse: NurseEntity, reviewerEmail: String): Result<Unit> {
         val docPath = "nurses/${nurse.id}"
         return try {
@@ -833,6 +893,139 @@ class NursesRepository(
                     mapOf(
                         "title" to cleanTitle,
                         "message" to cleanMessage,
+                        "active" to active,
+                        "updatedBy" to cleanEmail,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun saveDirectoryConfig(
+        extraDesignations: List<String>,
+        extraCourseNames: List<String>,
+        extraSpecialties: List<String>,
+        adminEmail: String
+    ): Result<Unit> {
+        val docPath = "app_config/directory_config"
+        return try {
+            requireUserId()
+            val cleanEmail = adminEmail.trim().lowercase().take(128)
+            require(cleanEmail.length >= 2) { "Admin email is required." }
+
+            val cleanDesignations = extraDesignations
+                .map { it.trim().take(60) }
+                .filter { it.isNotBlank() && it !in BangladeshData.designations }
+                .distinct()
+                .take(40)
+            val cleanCourses = extraCourseNames
+                .map { it.trim().take(80) }
+                .filter { it.isNotBlank() && it !in BangladeshData.courseNames }
+                .distinct()
+                .take(40)
+            val cleanSpecialties = extraSpecialties
+                .map { it.trim().take(60) }
+                .filter { it.isNotBlank() && it !in BangladeshData.specialties }
+                .distinct()
+                .take(40)
+
+            val docRef = db.collection("app_config").document("directory_config")
+            val existingSnap = docRef.get().await()
+            if (!existingSnap.exists()) {
+                docRef.set(
+                    mapOf(
+                        "extraDesignations" to cleanDesignations,
+                        "extraCourseNames" to cleanCourses,
+                        "extraSpecialties" to cleanSpecialties,
+                        "updatedBy" to cleanEmail,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            } else {
+                docRef.update(
+                    mapOf(
+                        "extraDesignations" to cleanDesignations,
+                        "extraCourseNames" to cleanCourses,
+                        "extraSpecialties" to cleanSpecialties,
+                        "updatedBy" to cleanEmail,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun publishAppRelease(
+        latestVersionCode: Int,
+        latestVersionName: String,
+        releaseNotes: String,
+        apkDownloadUrl: String,
+        webPortalUrl: String,
+        active: Boolean,
+        adminEmail: String
+    ): Result<Unit> {
+        val docPath = "app_config/app_release"
+        return try {
+            requireUserId()
+            val cleanEmail = adminEmail.trim().lowercase().take(128)
+            val cleanVersionName = latestVersionName.trim().take(20)
+            val cleanNotes = releaseNotes.trim().take(400)
+            val cleanApkUrl = apkDownloadUrl.trim().take(300)
+            val cleanWebUrl = webPortalUrl.trim().take(300)
+
+            require(cleanEmail.length >= 2) { "Admin email is required." }
+            require(latestVersionCode in 1..99999) { "Version code must be between 1 and 99999." }
+            require(cleanVersionName.isNotBlank()) { "Version name is required (e.g., 1.3)." }
+            require(cleanApkUrl.isEmpty() || cleanApkUrl.startsWith("https://")) {
+                "APK download URL must start with https://"
+            }
+            require(cleanWebUrl.isEmpty() || cleanWebUrl.startsWith("https://")) {
+                "Web portal URL must start with https://"
+            }
+            if (active) {
+                require(cleanApkUrl.isNotBlank() || cleanWebUrl.isNotBlank()) {
+                    "Enter an APK download URL or Web Portal URL to activate update alerts."
+                }
+            }
+
+            val docRef = db.collection("app_config").document("app_release")
+            val existingSnap = docRef.get().await()
+            if (!existingSnap.exists()) {
+                docRef.set(
+                    mapOf(
+                        "latestVersionCode" to latestVersionCode,
+                        "latestVersionName" to cleanVersionName,
+                        "releaseNotes" to cleanNotes,
+                        "apkDownloadUrl" to cleanApkUrl,
+                        "webPortalUrl" to cleanWebUrl,
+                        "active" to active,
+                        "updatedBy" to cleanEmail,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            } else {
+                docRef.update(
+                    mapOf(
+                        "latestVersionCode" to latestVersionCode,
+                        "latestVersionName" to cleanVersionName,
+                        "releaseNotes" to cleanNotes,
+                        "apkDownloadUrl" to cleanApkUrl,
+                        "webPortalUrl" to cleanWebUrl,
                         "active" to active,
                         "updatedBy" to cleanEmail,
                         "updatedAt" to FieldValue.serverTimestamp()

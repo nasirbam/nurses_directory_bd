@@ -80,4 +80,17 @@ object ContactActions {
         }
         context.startActivity(Intent.createChooser(sendIntent, "Share Nurse Profile"))
     }
+
+    fun openWebUrl(context: Context, url: String) {
+        val cleanUrl = url.trim()
+        if (!cleanUrl.startsWith("https://", ignoreCase = true)) {
+            Toast.makeText(context, "Invalid or insecure update URL", Toast.LENGTH_SHORT).show()
+            return
+        }
+        val intent = Intent(Intent.ACTION_VIEW, Uri.parse(cleanUrl))
+        runCatching { context.startActivity(intent) }
+            .onFailure {
+                Toast.makeText(context, "No browser app found to open link", Toast.LENGTH_SHORT).show()
+            }
+    }
 }

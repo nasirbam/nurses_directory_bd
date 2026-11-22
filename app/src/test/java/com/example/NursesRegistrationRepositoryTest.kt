@@ -2,9 +2,11 @@ package com.example
 
 import com.example.data.AdminEntity
 import com.example.data.AdminRole
+import com.example.data.AppReleaseEntity
 import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.DirectoryConfigEntity
 import com.example.data.EducationEntry
 import com.example.data.LiveNoticeEntity
 import com.example.data.NurseCategory
@@ -179,5 +181,76 @@ class NursesRegistrationRepositoryTest {
         val allDistricts = BangladeshData.districtsByDivision.values.flatten()
         assertTrue(allDistricts.all { BangladeshData.upazilasForDistrict(it).isNotEmpty() })
         assertTrue("Shahbagh" in BangladeshData.upazilasForDistrict("Dhaka"))
+    }
+
+    @Test
+    fun directoryConfig_mergesDeduplicatesAndFiltersBlankLiveOptions() {
+        val config = DirectoryConfigEntity(
+            extraDesignations = listOf("  OT Nurse  ", "", "Midwife", "ICU Charge Nurse", "OT Nurse"),
+            extraCourseNames = listOf("  BSc in Critical Care ", "   ", "MSN", "Diploma in Cardiac Nursing"),
+            extraSpecialties = listOf("Neonatal ICU", "Emergency & Trauma", "  ")
+        )
+
+        val designations = config.mergedDesignations()
+        assertTrue("OT Nurse" in designations)
+        assertTrue("ICU Charge Nurse" in designations)
+        assertEquals(1, designations.count { it == "Midwife" })
+        assertEquals(1, designations.count { it == "OT Nurse" })
+        assertFalse(designations.any { it.isBlank() })
+
+        val courses = config.mergedCourseNames()
+        assertTrue("BSc in Critical Care" in courses)
+        assertTrue("Diploma in Cardiac Nursing" in courses)
+        assertEquals(1, courses.count { it == "MSN" })
+        assertFalse(courses.any { it.isBlank() })
+
+        val specialties = config.mergedSpecialties()
+        assertTrue("Neonatal ICU" in specialties)
+        assertEquals(1, specialties.count { it == "Emergency & Trauma" })
+        assertFalse(specialties.any { it.isBlank() })
+    }
+
+    @Test
+    fun appRelease_detectsNewerUpdateOnlyWhenActiveHigherVersionAndUrlPresent() {
+        val inactiveRelease = AppReleaseEntity(
+            latestVersionCode = 10,
+            latestVersionName = "2.0",
+            apkDownloadUrl = "https://github.com/example/releases/latest",
+            active = false
+        )
+        assertFalse(inactiveRelease.hasNewerUpdate(currentVersionCode = 4))
+
+        val olderOrEqualRelease = AppReleaseEntity(
+            latestVersionCode = 4,
+            latestVersionName = "1.3",
+            apkDownloadUrl = "https://github.com/example/releases/latest",
+            active = true
+        )
+        assertFalse(olderOrEqualRelease.hasNewerUpdate(currentVersionCode = 4))
+
+        val missingUrlRelease = AppReleaseEntity(
+            latestVersionCode = 5,
+            latestVersionName = "1.4",
+            apkDownloadUrl = "",
+            webPortalUrl = "   ",
+            active = true
+        )
+        assertFalse(missingUrlRelease.hasNewerUpdate(currentVersionCode = 4))
+
+        val validApkRelease = AppReleaseEntity(
+            latestVersionCode = 5,
+            latestVersionName = "1.4",
+            apkDownloadUrl = "https://github.com/example/releases/latest",
+            active = true
+        )
+        assertTrue(validApkRelease.hasNewerUpdate(currentVersionCode = 4))
+
+        val validWebOnlyRelease = AppReleaseEntity(
+            latestVersionCode = 5,
+            latestVersionName = "1.4",
+            webPortalUrl = "https://nursesbd.example.com",
+            active = true
+        )
+        assertTrue(validWebOnlyRelease.hasNewerUpdate(currentVersionCode = 4))
     }
 }

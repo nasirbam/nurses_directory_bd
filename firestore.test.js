@@ -647,3 +647,93 @@ test("Categories, parent names, multi-degree educations, Non-Govt optional workp
   await assertSucceeds(batch.commit());
 });
 
+test("Live directory_config and app_release: admin writes & signed-in reads succeed; non-admin & http URLs fail", async () => {
+  const aliceDb = testEnv
+    .authenticatedContext(ALICE_UID, { email: ALICE_EMAIL, email_verified: true })
+    .firestore();
+  const adminDb = testEnv
+    .authenticatedContext(BOOTSTRAP_UID, { email: BOOTSTRAP_EMAIL, email_verified: true })
+    .firestore();
+
+  const now = new Date(Date.now() - 1000);
+
+  // Non-admin cannot create directory_config or app_release
+  await assertFails(
+    aliceDb.collection("app_config").doc("directory_config").set({
+      extraDesignations: ["Matron"],
+      extraCourseNames: ["Post Basic Oncology"],
+      extraSpecialties: ["Dialysis"],
+      updatedBy: ALICE_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+  await assertFails(
+    aliceDb.collection("app_config").doc("app_release").set({
+      latestVersionCode: 5,
+      latestVersionName: "1.4",
+      releaseNotes: "Rogue update",
+      apkDownloadUrl: "https://example.com/app.apk",
+      webPortalUrl: "",
+      active: true,
+      updatedBy: ALICE_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  // Admin rejects insecure http:// URL
+  await assertFails(
+    adminDb.collection("app_config").doc("app_release").set({
+      latestVersionCode: 5,
+      latestVersionName: "1.4",
+      releaseNotes: "Insecure URL",
+      apkDownloadUrl: "http://example.com/app.apk",
+      webPortalUrl: "",
+      active: true,
+      updatedBy: BOOTSTRAP_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  // Admin creates directory_config & app_release validly
+  await assertSucceeds(
+    adminDb.collection("app_config").doc("directory_config").set({
+      extraDesignations: ["Matron", "Nursing Superintendent"],
+      extraCourseNames: ["Post Basic ICU Course"],
+      extraSpecialties: ["Burn & Plastic"],
+      updatedBy: BOOTSTRAP_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+  await assertSucceeds(
+    adminDb.collection("app_config").doc("app_release").set({
+      latestVersionCode: 4,
+      latestVersionName: "1.3",
+      releaseNotes: "Live dynamic form options and update alerts.",
+      apkDownloadUrl: "https://github.com/example/nursesbd/releases/tag/latest-apk",
+      webPortalUrl: "https://example.github.io/nursesbd/",
+      active: true,
+      updatedBy: BOOTSTRAP_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  // Admin partial update preserves createdAt
+  await assertSucceeds(
+    adminDb.collection("app_config").doc("directory_config").update({
+      extraDesignations: ["Matron", "Deputy Nursing Superintendent"],
+      extraCourseNames: ["Post Basic ICU Course"],
+      extraSpecialties: ["Burn & Plastic"],
+      updatedBy: BOOTSTRAP_EMAIL,
+      updatedAt: new Date(Date.now() - 500),
+    })
+  );
+
+  // Signed-in nurse can read both documents live
+  await assertSucceeds(aliceDb.collection("app_config").doc("directory_config").get());
+  await assertSucceeds(aliceDb.collection("app_config").doc("app_release").get());
+});

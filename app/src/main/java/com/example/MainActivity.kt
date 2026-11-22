@@ -311,7 +311,13 @@ fun NursesBDApp(
     val myTransferRequests by viewModel.myTransferRequests.collectAsStateWithLifecycle()
     val adminTransferRequests by viewModel.adminTransferRequests.collectAsStateWithLifecycle()
     val liveNotice by viewModel.liveNotice.collectAsStateWithLifecycle()
+    val directoryConfig by viewModel.directoryConfig.collectAsStateWithLifecycle()
+    val appRelease by viewModel.appRelease.collectAsStateWithLifecycle()
     val selectedNurse by viewModel.selectedNurse.collectAsStateWithLifecycle()
+
+    val mergedDesignations = remember(directoryConfig) { directoryConfig.mergedDesignations() }
+    val mergedCourses = remember(directoryConfig) { directoryConfig.mergedCourseNames() }
+    val mergedSpecialties = remember(directoryConfig) { directoryConfig.mergedSpecialties() }
 
     var nurseToEdit by remember { mutableStateOf<NurseEntity?>(null) }
     var nurseForTransfer by remember { mutableStateOf<NurseEntity?>(null) }
@@ -483,6 +489,8 @@ fun NursesBDApp(
                             DirectoryScreen(
                                 uiState = directoryState,
                                 liveNotice = liveNotice,
+                                appRelease = appRelease,
+                                specialtyOptions = mergedSpecialties,
                                 onSearchQueryChange = viewModel::updateSearchQuery,
                                 onSelectCategory = viewModel::selectCategoryFilter,
                                 onSelectDivision = viewModel::selectDivisionFilter,
@@ -512,6 +520,9 @@ fun NursesBDApp(
                                 signedInEmail = viewModel.currentUserEmail,
                                 prefillName = adminSession.currentAdmin?.fullName ?: "",
                                 isAdminUser = adminSession.isAuthorizedAdmin,
+                                designationOptions = mergedDesignations,
+                                courseNameOptions = mergedCourses,
+                                specialtyOptions = mergedSpecialties,
                                 mySubmissions = mySubmissions,
                                 myTransferRequests = myTransferRequests,
                                 onRequestTransfer = { nurseForTransfer = it },
@@ -530,6 +541,8 @@ fun NursesBDApp(
                                 allNurses = allNurses,
                                 transferRequests = adminTransferRequests,
                                 liveNotice = liveNotice,
+                                directoryConfig = directoryConfig,
+                                appRelease = appRelease,
                                 hasOwnNurseProfile = mySubmissions.isNotEmpty(),
                                 onRegisterSelfAsNurse = { navigateTo(Routes.REGISTER) },
                                 onSignOutAndSwitch = onSignOut,
@@ -540,6 +553,8 @@ fun NursesBDApp(
                                 onApproveTransfer = viewModel::approveTransferRequest,
                                 onRejectTransfer = viewModel::rejectTransferRequest,
                                 onPublishLiveNotice = viewModel::publishLiveNotice,
+                                onSaveDirectoryConfig = viewModel::saveDirectoryConfig,
+                                onPublishAppRelease = viewModel::publishAppRelease,
                                 onAddAdmin = viewModel::addAdmin,
                                 onRemoveAdmin = viewModel::removeAdmin,
                                 onShowMessage = { msg ->
@@ -581,6 +596,9 @@ fun NursesBDApp(
     nurseToEdit?.let { target ->
         EditNurseDialog(
             nurse = target,
+            designationOptions = mergedDesignations,
+            courseNameOptions = mergedCourses,
+            specialtyOptions = mergedSpecialties,
             onDismiss = { nurseToEdit = null },
             onSave = { updated, onError ->
                 viewModel.updateNurseByAdmin(updated) { res ->
@@ -600,6 +618,7 @@ fun NursesBDApp(
     nurseForTransfer?.let { target ->
         RequestTransferDialog(
             nurse = target,
+            designationOptions = mergedDesignations,
             onDismiss = { nurseForTransfer = null },
             onSubmit = { newCat, newUid, newDesig, newDiv, newDist, newUpazila, newHospital, note, onError ->
                 viewModel.submitTransferRequest(

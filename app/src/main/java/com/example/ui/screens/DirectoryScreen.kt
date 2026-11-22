@@ -32,13 +32,17 @@ import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationCity
 import androidx.compose.material.icons.filled.LocationOn
 import androidx.compose.material.icons.filled.MedicalServices
+import androidx.compose.material.icons.filled.OpenInBrowser
 import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.SystemUpdate
 import androidx.compose.material.icons.filled.VerifiedUser
+import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -68,7 +72,9 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import com.example.BuildConfig
 import com.example.R
+import com.example.data.AppReleaseEntity
 import com.example.data.BangladeshData
 import com.example.data.LiveNoticeEntity
 import com.example.data.NurseCategory
@@ -80,6 +86,8 @@ import com.example.ui.DirectoryUiState
 fun DirectoryScreen(
     uiState: DirectoryUiState,
     liveNotice: LiveNoticeEntity? = null,
+    appRelease: AppReleaseEntity? = null,
+    specialtyOptions: List<String> = BangladeshData.specialties,
     onSearchQueryChange: (String) -> Unit,
     onSelectCategory: (String) -> Unit = {},
     onSelectDivision: (String) -> Unit,
@@ -194,6 +202,74 @@ fun DirectoryScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Color(0xFFE0F7F1)
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (appRelease != null && appRelease.hasNewerUpdate(BuildConfig.VERSION_CODE)) {
+                item(span = { GridItemSpan(columns) }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("directory_app_update_card"),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.tertiaryContainer
+                        )
+                    ) {
+                        Column(
+                            modifier = Modifier.padding(14.dp),
+                            verticalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Row(verticalAlignment = Alignment.CenterVertically) {
+                                Icon(
+                                    imageVector = Icons.Filled.SystemUpdate,
+                                    contentDescription = "New Version Available",
+                                    tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                    modifier = Modifier.size(20.dp)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Text(
+                                    text = "নতুন ভার্সন পাওয়া গেছে • v${appRelease.latestVersionName}",
+                                    style = MaterialTheme.typography.titleSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                            if (appRelease.releaseNotes.isNotBlank()) {
+                                Text(
+                                    text = appRelease.releaseNotes,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onTertiaryContainer
+                                )
+                            }
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                                if (appRelease.apkDownloadUrl.isNotBlank()) {
+                                    Button(
+                                        onClick = {
+                                            ContactActions.openWebUrl(context, appRelease.apkDownloadUrl)
+                                        },
+                                        modifier = Modifier.testTag("directory_update_apk_button")
+                                    ) {
+                                        Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Update APK")
+                                    }
+                                }
+                                if (appRelease.webPortalUrl.isNotBlank()) {
+                                    FilledTonalButton(
+                                        onClick = {
+                                            ContactActions.openWebUrl(context, appRelease.webPortalUrl)
+                                        },
+                                        modifier = Modifier.testTag("directory_open_web_portal_button")
+                                    ) {
+                                        Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
+                                        Spacer(Modifier.width(6.dp))
+                                        Text("Web Portal")
+                                    }
+                                }
                             }
                         }
                     }
@@ -530,7 +606,7 @@ fun DirectoryScreen(
                                             showSpecialtyMenu = false
                                         }
                                     )
-                                    BangladeshData.specialties.forEach { specialty ->
+                                    specialtyOptions.forEach { specialty ->
                                         DropdownMenuItem(
                                             text = { Text(specialty) },
                                             onClick = {

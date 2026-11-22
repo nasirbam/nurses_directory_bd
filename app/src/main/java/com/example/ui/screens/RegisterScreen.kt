@@ -106,6 +106,9 @@ fun RegisterScreen(
     signedInEmail: String = "",
     prefillName: String = "",
     isAdminUser: Boolean = false,
+    designationOptions: List<String> = BangladeshData.designations,
+    courseNameOptions: List<String> = BangladeshData.courseNames,
+    specialtyOptions: List<String> = BangladeshData.specialties,
     mySubmissions: List<NurseEntity> = emptyList(),
     myTransferRequests: List<TransferRequestEntity> = emptyList(),
     onRequestTransfer: (NurseEntity) -> Unit = {},
@@ -905,20 +908,21 @@ fun RegisterScreen(
                 FormDropdownField(
                     label = "Designation",
                     selected = selectedDesignation,
-                    options = BangladeshData.designations,
+                    options = (designationOptions + selectedDesignation).distinct(),
                     onSelect = { selectedDesignation = it },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 EducationInputSection(
                     educations = educations,
-                    onEducationsChange = { educations = it }
+                    onEducationsChange = { educations = it },
+                    courseOptionsList = courseNameOptions
                 )
 
                 FormDropdownField(
                     label = "Clinical Specialty",
                     selected = selectedSpecialty,
-                    options = BangladeshData.specialties,
+                    options = (specialtyOptions + selectedSpecialty).distinct(),
                     onSelect = { selectedSpecialty = it },
                     modifier = Modifier.fillMaxWidth()
                 )

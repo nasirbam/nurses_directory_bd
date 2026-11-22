@@ -52,6 +52,9 @@ import com.example.ui.screens.FormDropdownField
 @Composable
 fun EditNurseDialog(
     nurse: NurseEntity,
+    designationOptions: List<String> = BangladeshData.designations,
+    courseNameOptions: List<String> = BangladeshData.courseNames,
+    specialtyOptions: List<String> = BangladeshData.specialties,
     onDismiss: () -> Unit,
     onSave: (updatedNurse: NurseEntity, onError: (String) -> Unit) -> Unit
 ) {
@@ -327,20 +330,21 @@ fun EditNurseDialog(
                 FormDropdownField(
                     label = "Designation",
                     selected = designation,
-                    options = (BangladeshData.designations + designation).distinct(),
+                    options = (designationOptions + designation).distinct(),
                     onSelect = { designation = it },
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 EducationInputSection(
                     educations = educations,
-                    onEducationsChange = { educations = it }
+                    onEducationsChange = { educations = it },
+                    courseOptionsList = courseNameOptions
                 )
 
                 FormDropdownField(
                     label = "Clinical Specialty",
                     selected = specialty,
-                    options = (BangladeshData.specialties + specialty).distinct(),
+                    options = (specialtyOptions + specialty).distinct(),
                     onSelect = { specialty = it },
                     modifier = Modifier.fillMaxWidth()
                 )
@@ -455,6 +459,7 @@ fun EditNurseDialog(
 @Composable
 fun RequestTransferDialog(
     nurse: NurseEntity,
+    designationOptions: List<String> = BangladeshData.designations,
     onDismiss: () -> Unit,
     onSubmit: (
         newCategory: NurseCategory,
@@ -618,7 +623,7 @@ fun RequestTransferDialog(
                 FormDropdownField(
                     label = "New Designation",
                     selected = newDesignation,
-                    options = (BangladeshData.designations + newDesignation).distinct(),
+                    options = (designationOptions + newDesignation).distinct(),
                     onSelect = { newDesignation = it },
                     modifier = Modifier.fillMaxWidth()
                 )

@@ -278,6 +278,54 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["title", "message", "active", "updatedBy", "createdAt", "updatedAt"]
+    },
+    "DirectoryConfig": {
+      "title": "DirectoryConfig",
+      "description": "Live over-the-air dropdown options (designations, course names, clinical specialties) synced across all devices without APK re-download.",
+      "type": "object",
+      "properties": {
+        "extraDesignations": { "type": "array", "items": { "type": "string" } },
+        "extraCourseNames": { "type": "array", "items": { "type": "string" } },
+        "extraSpecialties": { "type": "array", "items": { "type": "string" } },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "extraDesignations",
+        "extraCourseNames",
+        "extraSpecialties",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AppRelease": {
+      "title": "AppRelease",
+      "description": "Live app version metadata and external APK / Web Portal release URLs for automatic in-app update alerts.",
+      "type": "object",
+      "properties": {
+        "latestVersionCode": { "type": "integer" },
+        "latestVersionName": { "type": "string" },
+        "releaseNotes": { "type": "string" },
+        "apkDownloadUrl": { "type": "string" },
+        "webPortalUrl": { "type": "string" },
+        "active": { "type": "boolean" },
+        "updatedBy": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "latestVersionCode",
+        "latestVersionName",
+        "releaseNotes",
+        "apkDownloadUrl",
+        "webPortalUrl",
+        "active",
+        "updatedBy",
+        "createdAt",
+        "updatedAt"
+      ]
     }
   },
   "firestore": {
@@ -295,7 +343,7 @@
     },
     "/app_config/{configId}": {
       "schema": { "$ref": "#/entities/LiveNotice" },
-      "description": "Live remote configuration and admin announcement notice synced across all app installs."
+      "description": "Live remote configuration documents (live_notice, directory_config, app_release) synced across all app installs."
     }
   }
 }
