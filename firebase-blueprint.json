@@ -171,9 +171,148 @@
         "bio",
         "approvalStatus",
         "rejectionReason",
+        "reviewedAt",
         "createdAt",
         "updatedAt"
       ]
+    },
+    "TransferRequest": {
+      "title": "TransferRequest",
+      "description": "Nurse hospital transfer request submitted by the nurse owner for admin approval.",
+      "type": "object",
+      "properties": {
+        "nurseId": {
+          "type": "string",
+          "description": "Target nurse document ID in /nurses."
+        },
+        "nurseName": {
+          "type": "string",
+          "description": "Nurse full name (3 to 80 characters)."
+        },
+        "bnmcNumber": {
+          "type": "string",
+          "description": "BNMC registration number (4 to 30 characters)."
+        },
+        "requestedByUid": {
+          "type": "string",
+          "description": "Firebase Auth UID of the requesting nurse."
+        },
+        "currentHospitalName": {
+          "type": "string",
+          "description": "Current workplace/hospital name."
+        },
+        "currentDivision": {
+          "type": "string",
+          "description": "Current Bangladesh division."
+        },
+        "currentDistrict": {
+          "type": "string",
+          "description": "Current Bangladesh district."
+        },
+        "currentUpazila": {
+          "type": "string",
+          "description": "Current Bangladesh upazila."
+        },
+        "newHospitalName": {
+          "type": "string",
+          "description": "Requested destination hospital/workplace name (3 to 120 characters)."
+        },
+        "newDivision": {
+          "type": "string",
+          "description": "Requested destination Bangladesh division."
+        },
+        "newDistrict": {
+          "type": "string",
+          "description": "Requested destination Bangladesh district."
+        },
+        "newUpazila": {
+          "type": "string",
+          "description": "Requested destination Bangladesh upazila."
+        },
+        "transferNote": {
+          "type": "string",
+          "description": "Optional transfer order reference or reason (0 to 250 characters)."
+        },
+        "status": {
+          "type": "string",
+          "enum": ["PENDING", "APPROVED", "REJECTED"],
+          "description": "Admin moderation status; new requests always start as PENDING."
+        },
+        "rejectionReason": {
+          "type": "string",
+          "description": "Admin rejection note if rejected (0 to 250 characters)."
+        },
+        "reviewedBy": {
+          "type": "string",
+          "description": "Email of reviewing administrator."
+        },
+        "reviewedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of admin review."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when submitted."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp when updated."
+        }
+      },
+      "required": [
+        "nurseId",
+        "nurseName",
+        "bnmcNumber",
+        "requestedByUid",
+        "currentHospitalName",
+        "currentDivision",
+        "currentDistrict",
+        "newHospitalName",
+        "newDivision",
+        "newDistrict",
+        "transferNote",
+        "status",
+        "rejectionReason",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "LiveNotice": {
+      "title": "LiveNotice",
+      "description": "Real-time directory broadcast banner updated by admins without APK re-downloads.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "description": "Short notice headline (0 to 100 characters)."
+        },
+        "message": {
+          "type": "string",
+          "description": "Live notice message body (0 to 400 characters)."
+        },
+        "active": {
+          "type": "boolean",
+          "description": "Whether the live notice banner is currently visible."
+        },
+        "updatedBy": {
+          "type": "string",
+          "description": "Email of the administrator who last updated the notice."
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of creation."
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time",
+          "description": "Server timestamp of last modification."
+        }
+      },
+      "required": ["title", "message", "active", "updatedBy", "createdAt", "updatedAt"]
     }
   },
   "firestore": {
@@ -188,6 +327,18 @@
         "$ref": "#/entities/Nurse"
       },
       "description": "Registered nurses directory across Bangladesh with approval workflow."
+    },
+    "/transfer_requests/{requestId}": {
+      "schema": {
+        "$ref": "#/entities/TransferRequest"
+      },
+      "description": "Hospital transfer requests initiated by approved nurses and approved/rejected by admins."
+    },
+    "/app_config/{configId}": {
+      "schema": {
+        "$ref": "#/entities/LiveNotice"
+      },
+      "description": "Live remote configuration and admin announcement notice synced across all app installs."
     }
   }
 }

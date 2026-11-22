@@ -233,6 +233,15 @@ test("Update rules: owner can update safe profile fields only; cannot self-appro
   await assertSucceeds(
     aliceDb.collection("nurses").doc("alice_app").update({
       availabilityStatus: "EMERGENCY_AVAILABLE",
+      phone: "01711450219",
+      bio: "Updated bio note.",
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
+  // Owner cannot directly change hospitalName/upazila (must use transfer request)
+  await assertFails(
+    aliceDb.collection("nurses").doc("alice_app").update({
       upazila: "Dhanmondi",
       hospitalName: "BSMMU Dhaka",
       updatedAt: new Date(Date.now() - 1000),
@@ -323,6 +332,23 @@ test("Bootstrap admin & Email Spoofing protection: verified bootstrap admin can 
     })
   );
 
+  // Admin can edit an approved nurse's profile fields and delete if needed
+  await assertSucceeds(
+    adminDb.collection("nurses").doc("pending_n1").update({
+      fullName: "Nusrat Jahan Updated",
+      hospitalName: "Square Hospital Dhaka",
+      division: "Dhaka",
+      district: "Dhaka",
+      upazila: "Dhanmondi",
+      designation: "Senior Staff Nurse",
+      phone: "01711998877",
+      whatsapp: "01711998877",
+      reviewedBy: BOOTSTRAP_EMAIL,
+      reviewedAt: new Date(Date.now() - 1000),
+      updatedAt: new Date(Date.now() - 1000),
+    })
+  );
+
   // Second admin (MODERATOR) can approve/list nurses, but CANNOT add or remove admins
   const modDb = testEnv
     .authenticatedContext(SECOND_ADMIN_UID, {
@@ -346,4 +372,142 @@ test("Bootstrap admin & Email Spoofing protection: verified bootstrap admin can 
   // Non-admin cannot read another admin's doc or list admins
   await assertFails(aliceDb.collection("admins").get());
   await assertFails(aliceDb.collection("admins").doc(BOOTSTRAP_EMAIL).get());
+});
+
+test("Hospital transfer requests: approved nurse owner can submit PENDING transfer; admin approves & updates nurse atomically", async () => {
+  await testEnv.withSecurityRulesDisabled(async (ctx) => {
+    const db = ctx.firestore();
+    await db
+      .collection("nurses")
+      .doc("alice_approved")
+      .set(validNurseCreatePayload(ALICE_UID, { approvalStatus: "APPROVED" }));
+    await db
+      .collection("nurses")
+      .doc("alice_pending")
+      .set(validNurseCreatePayload(ALICE_UID, { approvalStatus: "PENDING" }));
+    await db
+      .collection("nurses")
+      .doc("bob_approved")
+      .set(validNurseCreatePayload(BOB_UID, { approvalStatus: "APPROVED" }));
+  });
+
+  const aliceDb = testEnv
+    .authenticatedContext(ALICE_UID, { email: ALICE_EMAIL, email_verified: true })
+    .firestore();
+  const bobDb = testEnv
+    .authenticatedContext(BOB_UID, { email: BOB_EMAIL, email_verified: true })
+    .firestore();
+  const adminDb = testEnv
+    .authenticatedContext(BOOTSTRAP_UID, { email: BOOTSTRAP_EMAIL, email_verified: true })
+    .firestore();
+
+  const now = new Date(Date.now() - 1000);
+  const transferPayload = {
+    nurseId: "alice_approved",
+    nurseName: "Nusrat Jahan Mim",
+    bnmcNumber: "BNMC-48920",
+    requestedByUid: ALICE_UID,
+    currentHospitalName: "Dhaka Medical College Hospital",
+    currentDivision: "Dhaka",
+    currentDistrict: "Dhaka",
+    currentUpazila: "Shahbagh",
+    newHospitalName: "Chattogram Medical College Hospital",
+    newDivision: "Chattogram",
+    newDistrict: "Chattogram",
+    newUpazila: "Panchlaish",
+    transferNote: "Transferred via DGHS order #412",
+    status: "PENDING",
+    rejectionReason: "",
+    createdAt: now,
+    updatedAt: now,
+  };
+
+  // Alice submits valid transfer request for her own APPROVED nurse profile
+  await assertSucceeds(
+    aliceDb.collection("transfer_requests").doc("tr_1").set(transferPayload)
+  );
+
+  // Alice queries her own transfer requests
+  await assertSucceeds(
+    aliceDb.collection("transfer_requests").where("requestedByUid", "==", ALICE_UID).get()
+  );
+
+  // Alice cannot submit transfer for PENDING profile or Bob's profile
+  await assertFails(
+    aliceDb
+      .collection("transfer_requests")
+      .doc("tr_pending_fail")
+      .set({ ...transferPayload, nurseId: "alice_pending" })
+  );
+  await assertFails(
+    aliceDb
+      .collection("transfer_requests")
+      .doc("tr_bob_fail")
+      .set({ ...transferPayload, nurseId: "bob_approved" })
+  );
+
+  // Bob cannot read or list all transfer requests, nor self-approve
+  await assertFails(bobDb.collection("transfer_requests").doc("tr_1").get());
+  await assertFails(bobDb.collection("transfer_requests").get());
+  await assertFails(
+    aliceDb.collection("transfer_requests").doc("tr_1").update({
+      status: "APPROVED",
+      updatedAt: new Date(Date.now() - 500),
+    })
+  );
+
+  // Admin can list all transfer requests and atomically update nurse + approve transfer
+  await assertSucceeds(adminDb.collection("transfer_requests").get());
+  const batch = adminDb.batch();
+  batch.update(adminDb.collection("nurses").doc("alice_approved"), {
+    division: "Chattogram",
+    district: "Chattogram",
+    upazila: "Panchlaish",
+    hospitalName: "Chattogram Medical College Hospital",
+    reviewedBy: BOOTSTRAP_EMAIL,
+    reviewedAt: new Date(Date.now() - 500),
+    updatedAt: new Date(Date.now() - 500),
+  });
+  batch.update(adminDb.collection("transfer_requests").doc("tr_1"), {
+    status: "APPROVED",
+    rejectionReason: "",
+    reviewedBy: BOOTSTRAP_EMAIL,
+    reviewedAt: new Date(Date.now() - 500),
+    updatedAt: new Date(Date.now() - 500),
+  });
+  await assertSucceeds(batch.commit());
+});
+
+test("Live remote notice: signed-in users can read app_config/live_notice; only admins can publish", async () => {
+  const aliceDb = testEnv
+    .authenticatedContext(ALICE_UID, { email: ALICE_EMAIL, email_verified: true })
+    .firestore();
+  const adminDb = testEnv
+    .authenticatedContext(BOOTSTRAP_UID, { email: BOOTSTRAP_EMAIL, email_verified: true })
+    .firestore();
+
+  const now = new Date(Date.now() - 1000);
+  await assertFails(
+    aliceDb.collection("app_config").doc("live_notice").set({
+      title: "Fake Notice",
+      message: "Unauthorized",
+      active: true,
+      updatedBy: ALICE_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  await assertSucceeds(
+    adminDb.collection("app_config").doc("live_notice").set({
+      title: "Directory Update",
+      message: "New hospital transfer requests are now open.",
+      active: true,
+      updatedBy: BOOTSTRAP_EMAIL,
+      createdAt: now,
+      updatedAt: now,
+    })
+  );
+
+  await assertSucceeds(aliceDb.collection("app_config").doc("live_notice").get());
 });

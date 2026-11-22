@@ -290,6 +290,87 @@ class NursesRepository(
         }
     }
 
+    fun observeMyTransferRequests(uid: String): Flow<List<TransferRequestEntity>> {
+        if (uid.isBlank()) return flowOf(emptyList())
+        val path = "transfer_requests"
+        return db.collection(path)
+            .whereEqualTo("requestedByUid", uid)
+            .snapshots()
+            .map { snapshot ->
+                snapshot.toObjects(
+                    TransferRequestEntity::class.java,
+                    DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                ).sortedByDescending { it.createdAt ?: Timestamp(0, 0) }
+            }
+            .catch { error ->
+                val firestoreError = generateSequence(error) { it.cause }
+                    .filterIsInstance<FirebaseFirestoreException>()
+                    .firstOrNull()
+                if (firestoreError == null && error is CancellationException) throw error
+                val exceptionToLog = firestoreError ?: (error as? Exception)
+                if (exceptionToLog != null && auth.currentUser?.uid == uid) {
+                    handleFirestoreError(exceptionToLog, OperationType.LIST, path)
+                }
+                throw error
+            }
+    }
+
+    fun observeAllTransferRequestsForAdmin(): Flow<List<TransferRequestEntity>> = flow {
+        val uid = requireUserId()
+        val path = "transfer_requests"
+        emitAll(
+            db.collection(path)
+                .snapshots()
+                .map { snapshot ->
+                    snapshot.toObjects(
+                        TransferRequestEntity::class.java,
+                        DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                    ).sortedByDescending { it.createdAt ?: Timestamp(0, 0) }
+                }
+                .catch { error ->
+                    val firestoreError = generateSequence(error) { it.cause }
+                        .filterIsInstance<FirebaseFirestoreException>()
+                        .firstOrNull()
+                    if (firestoreError == null && error is CancellationException) throw error
+                    val exceptionToLog = firestoreError ?: (error as? Exception)
+                    if (exceptionToLog != null && auth.currentUser?.uid == uid) {
+                        handleFirestoreError(exceptionToLog, OperationType.LIST, path)
+                    }
+                    throw error
+                }
+        )
+    }
+
+    fun observeLiveNotice(): Flow<LiveNoticeEntity?> = flow {
+        val uid = requireUserId()
+        val path = "app_config/live_notice"
+        emitAll(
+            db.collection("app_config").document("live_notice")
+                .snapshots()
+                .map { snapshot ->
+                    if (snapshot.exists()) {
+                        snapshot.toObject(
+                            LiveNoticeEntity::class.java,
+                            DocumentSnapshot.ServerTimestampBehavior.ESTIMATE
+                        )
+                    } else {
+                        null
+                    }
+                }
+                .catch { error ->
+                    val firestoreError = generateSequence(error) { it.cause }
+                        .filterIsInstance<FirebaseFirestoreException>()
+                        .firstOrNull()
+                    if (firestoreError == null && error is CancellationException) throw error
+                    val exceptionToLog = firestoreError ?: (error as? Exception)
+                    if (exceptionToLog != null && auth.currentUser?.uid == uid) {
+                        handleFirestoreError(exceptionToLog, OperationType.GET, path)
+                    }
+                    throw error
+                }
+        )
+    }
+
     suspend fun approveNurse(nurse: NurseEntity, reviewerEmail: String): Result<Unit> {
         val docPath = "nurses/${nurse.id}"
         return try {
@@ -345,6 +426,100 @@ class NursesRepository(
         }
     }
 
+    suspend fun updateNurseByAdmin(
+        updatedNurse: NurseEntity,
+        reviewerEmail: String
+    ): Result<Unit> {
+        val docPath = "nurses/${updatedNurse.id}"
+        return try {
+            requireUserId()
+            require(updatedNurse.id.isNotBlank()) { "Missing nurse document ID." }
+
+            val cleanedName = updatedNurse.fullName.trim()
+            val cleanedBnmc = updatedNurse.bnmcNumber.trim().uppercase()
+            val cleanedPhone = updatedNurse.phone.replace(Regex("[\\s\\-]"), "")
+            val cleanedHospital = updatedNurse.hospitalName.trim()
+            val cleanedEmail = updatedNurse.email.trim()
+            val cleanedBio = updatedNurse.bio.trim()
+            val expYears = updatedNurse.experienceYears.coerceIn(0, 60)
+
+            require(cleanedName.length in 3..80) {
+                "Full name must be between 3 and 80 characters."
+            }
+            require(cleanedBnmc.length in 4..30) {
+                "BNMC registration number must be between 4 and 30 characters."
+            }
+            require(SecurityUtils.isValidBangladeshPhone(cleanedPhone) && cleanedPhone.length in 11..20) {
+                "Enter a valid Bangladeshi phone number (e.g. 017XXXXXXXX)."
+            }
+            require(cleanedHospital.length in 3..120) {
+                "Hospital or workplace name must be between 3 and 120 characters."
+            }
+            if (cleanedEmail.isNotBlank()) {
+                require(SecurityUtils.isValidEmail(cleanedEmail) && cleanedEmail.length <= 120) {
+                    "Enter a valid email address (max 120 chars)."
+                }
+            }
+            require(cleanedBio.length <= 400) {
+                "Short note must be 400 characters or less."
+            }
+            require(updatedNurse.bloodGroup in BangladeshData.bloodGroups) {
+                "Select a valid blood group."
+            }
+
+            val whatsappNumber = if (updatedNurse.whatsapp.isBlank()) {
+                cleanedPhone
+            } else {
+                updatedNurse.whatsapp.replace(Regex("[\\s\\-]"), "").also {
+                    require(SecurityUtils.isValidBangladeshPhone(it) && it.length in 11..20) {
+                        "Enter a valid Bangladeshi WhatsApp number (e.g. 017XXXXXXXX)."
+                    }
+                }
+            }
+
+            val duplicateBnmc = db.collection("nurses")
+                .whereEqualTo("bnmcNumber", cleanedBnmc)
+                .get()
+                .await()
+                .documents
+                .any { it.id != updatedNurse.id }
+
+            require(!duplicateBnmc) {
+                "BNMC number $cleanedBnmc is already assigned to another nurse."
+            }
+
+            val updates = mapOf(
+                "fullName" to cleanedName,
+                "bnmcNumber" to cleanedBnmc,
+                "designation" to updatedNurse.designation.trim().take(60),
+                "qualification" to updatedNurse.qualification.trim().take(80),
+                "specialty" to updatedNurse.specialty.trim().take(60),
+                "division" to updatedNurse.division.trim().take(40),
+                "district" to updatedNurse.district.trim().take(40),
+                "upazila" to updatedNurse.upazila.trim().take(50),
+                "hospitalName" to cleanedHospital,
+                "phone" to cleanedPhone,
+                "whatsapp" to whatsappNumber,
+                "email" to cleanedEmail,
+                "bloodGroup" to updatedNurse.bloodGroup,
+                "availabilityStatus" to updatedNurse.availabilityEnum.name,
+                "experienceYears" to expYears,
+                "bio" to cleanedBio,
+                "reviewedBy" to reviewerEmail.trim().lowercase().take(128),
+                "reviewedAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+
+            db.collection("nurses").document(updatedNurse.id).update(updates).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docPath)
+            Result.failure(e)
+        }
+    }
+
     suspend fun deleteNurse(nurseId: String): Result<Unit> {
         val docPath = "nurses/$nurseId"
         return try {
@@ -356,6 +531,217 @@ class NursesRepository(
             throw e
         } catch (e: Exception) {
             handleFirestoreError(e, OperationType.DELETE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun submitTransferRequest(
+        nurse: NurseEntity,
+        newDivision: String,
+        newDistrict: String,
+        newUpazila: String,
+        newHospitalName: String,
+        transferNote: String
+    ): Result<Unit> {
+        var docPath = "transfer_requests"
+        return try {
+            val uid = requireUserId()
+            require(nurse.id.isNotBlank()) { "Missing nurse profile ID." }
+            require(nurse.submittedByUid == uid) {
+                "You can only request a transfer for a profile registered with your account."
+            }
+            require(nurse.approvalEnum == ApprovalStatus.APPROVED) {
+                "Only approved nurse profiles can request a hospital transfer."
+            }
+
+            val cleanNewHospital = newHospitalName.trim()
+            val cleanNewDiv = newDivision.trim().take(40)
+            val cleanNewDist = newDistrict.trim().take(40)
+            val cleanNewUpazila = newUpazila.trim().take(50)
+            val cleanNote = transferNote.trim().take(250)
+
+            require(cleanNewHospital.length in 3..120) {
+                "New hospital name must be between 3 and 120 characters."
+            }
+            require(cleanNewDiv.length in 2..40 && cleanNewDist.length in 2..40) {
+                "Select valid destination division and district."
+            }
+
+            val hasSameHospital = cleanNewHospital.equals(nurse.hospitalName.trim(), ignoreCase = true) &&
+                cleanNewDist.equals(nurse.district.trim(), ignoreCase = true) &&
+                cleanNewUpazila.equals(nurse.upazila.trim(), ignoreCase = true)
+            require(!hasSameHospital) {
+                "New hospital/location must be different from your current workplace."
+            }
+
+            val existingPending = db.collection("transfer_requests")
+                .whereEqualTo("requestedByUid", uid)
+                .get()
+                .await()
+                .toObjects(TransferRequestEntity::class.java)
+                .any { it.nurseId == nurse.id && it.statusEnum == TransferStatus.PENDING }
+            require(!existingPending) {
+                "A transfer request is already pending admin approval for this profile."
+            }
+
+            val docRef = db.collection("transfer_requests").document()
+            docPath = docRef.path
+
+            val payload = mapOf(
+                "nurseId" to nurse.id,
+                "nurseName" to nurse.fullName.trim().take(80),
+                "bnmcNumber" to nurse.bnmcNumber.trim().take(30),
+                "requestedByUid" to uid,
+                "currentHospitalName" to nurse.hospitalName.trim().take(120),
+                "currentDivision" to nurse.division.trim().take(40),
+                "currentDistrict" to nurse.district.trim().take(40),
+                "currentUpazila" to nurse.upazila.trim().take(50),
+                "newHospitalName" to cleanNewHospital,
+                "newDivision" to cleanNewDiv,
+                "newDistrict" to cleanNewDist,
+                "newUpazila" to cleanNewUpazila,
+                "transferNote" to cleanNote,
+                "status" to TransferStatus.PENDING.name,
+                "rejectionReason" to "",
+                "createdAt" to FieldValue.serverTimestamp(),
+                "updatedAt" to FieldValue.serverTimestamp()
+            )
+            docRef.set(payload).await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.CREATE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun approveTransferRequest(
+        request: TransferRequestEntity,
+        reviewerEmail: String
+    ): Result<Unit> {
+        val docPath = "transfer_requests/${request.id}"
+        return try {
+            requireUserId()
+            require(request.id.isNotBlank() && request.nurseId.isNotBlank()) {
+                "Missing transfer request or nurse document ID."
+            }
+            val cleanReviewer = reviewerEmail.trim().lowercase().take(128)
+
+            val batch = db.batch()
+            val nurseRef = db.collection("nurses").document(request.nurseId)
+            val reqRef = db.collection("transfer_requests").document(request.id)
+
+            batch.update(
+                nurseRef,
+                mapOf(
+                    "division" to request.newDivision.trim().take(40),
+                    "district" to request.newDistrict.trim().take(40),
+                    "upazila" to request.newUpazila.trim().take(50),
+                    "hospitalName" to request.newHospitalName.trim().take(120),
+                    "reviewedBy" to cleanReviewer,
+                    "reviewedAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            batch.update(
+                reqRef,
+                mapOf(
+                    "status" to TransferStatus.APPROVED.name,
+                    "rejectionReason" to "",
+                    "reviewedBy" to cleanReviewer,
+                    "reviewedAt" to FieldValue.serverTimestamp(),
+                    "updatedAt" to FieldValue.serverTimestamp()
+                )
+            )
+            batch.commit().await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun rejectTransferRequest(
+        request: TransferRequestEntity,
+        reason: String,
+        reviewerEmail: String
+    ): Result<Unit> {
+        val docPath = "transfer_requests/${request.id}"
+        return try {
+            requireUserId()
+            require(request.id.isNotBlank()) { "Missing transfer request ID." }
+            val cleanReason = reason.trim().ifBlank { "Transfer details could not be verified" }.take(250)
+            db.collection("transfer_requests").document(request.id)
+                .update(
+                    mapOf(
+                        "status" to TransferStatus.REJECTED.name,
+                        "rejectionReason" to cleanReason,
+                        "reviewedBy" to reviewerEmail.trim().lowercase().take(128),
+                        "reviewedAt" to FieldValue.serverTimestamp(),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                )
+                .await()
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.UPDATE, docPath)
+            Result.failure(e)
+        }
+    }
+
+    suspend fun publishLiveNotice(
+        title: String,
+        message: String,
+        active: Boolean,
+        adminEmail: String
+    ): Result<Unit> {
+        val docPath = "app_config/live_notice"
+        return try {
+            requireUserId()
+            val cleanTitle = title.trim().take(100)
+            val cleanMessage = message.trim().take(400)
+            val cleanEmail = adminEmail.trim().lowercase().take(128)
+            require(cleanEmail.length >= 2) { "Admin email is required." }
+            if (active) {
+                require(cleanTitle.isNotBlank() || cleanMessage.isNotBlank()) {
+                    "Enter a notice title or message to publish live."
+                }
+            }
+
+            val docRef = db.collection("app_config").document("live_notice")
+            val existingSnap = docRef.get().await()
+            if (!existingSnap.exists()) {
+                docRef.set(
+                    mapOf(
+                        "title" to cleanTitle,
+                        "message" to cleanMessage,
+                        "active" to active,
+                        "updatedBy" to cleanEmail,
+                        "createdAt" to FieldValue.serverTimestamp(),
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            } else {
+                docRef.update(
+                    mapOf(
+                        "title" to cleanTitle,
+                        "message" to cleanMessage,
+                        "active" to active,
+                        "updatedBy" to cleanEmail,
+                        "updatedAt" to FieldValue.serverTimestamp()
+                    )
+                ).await()
+            }
+            Result.success(Unit)
+        } catch (e: CancellationException) {
+            throw e
+        } catch (e: Exception) {
+            handleFirestoreError(e, OperationType.WRITE, docPath)
             Result.failure(e)
         }
     }

@@ -26,6 +26,7 @@ import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Phone
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
 import androidx.compose.material3.Card
@@ -34,6 +35,7 @@ import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.FilterChip
 import androidx.compose.material3.FilterChipDefaults
 import androidx.compose.material3.Icon
@@ -60,7 +62,12 @@ import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
 import com.example.data.NurseEntity
 import com.example.data.SecurityUtils
+import com.example.data.TransferRequestEntity
+import com.example.data.TransferStatus
 import com.example.ui.auth.GoogleSignInButton
+import com.example.ui.theme.StatusApproved
+import com.example.ui.theme.StatusPending
+import com.example.ui.theme.StatusRejected
 
 private data class RegistrationFieldErrors(
     val fullNameError: String? = null,
@@ -84,6 +91,9 @@ private data class RegistrationFieldErrors(
 fun RegisterScreen(
     isSignedIn: Boolean,
     signedInEmail: String = "",
+    mySubmissions: List<NurseEntity> = emptyList(),
+    myTransferRequests: List<TransferRequestEntity> = emptyList(),
+    onRequestTransfer: (NurseEntity) -> Unit = {},
     onGoogleAuthSuccess: () -> Unit = {},
     onSubmitRegistration: (NurseEntity, (Result<Unit>) -> Unit) -> Unit,
     onNavigateAfterSuccess: () -> Unit,
@@ -302,6 +312,161 @@ fun RegisterScreen(
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
+                    }
+                }
+            }
+
+            if (mySubmissions.isNotEmpty() || myTransferRequests.isNotEmpty()) {
+                SectionCard(title = "My Profiles & Hospital Transfer (বদলি আবেদন)") {
+                    mySubmissions.forEach { profile ->
+                        val hasPendingTransfer = myTransferRequests.any {
+                            it.nurseId == profile.id && it.statusEnum == TransferStatus.PENDING
+                        }
+                        Surface(
+                            shape = MaterialTheme.shapes.medium,
+                            color = MaterialTheme.colorScheme.surfaceContainerLow,
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .testTag("my_profile_card_${profile.id}")
+                        ) {
+                            Column(
+                                modifier = Modifier.padding(12.dp),
+                                verticalArrangement = Arrangement.spacedBy(6.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Column(modifier = Modifier.weight(1f)) {
+                                        Text(
+                                            text = profile.fullName,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Text(
+                                            text = "${profile.hospitalName} • ${profile.district}",
+                                            style = MaterialTheme.typography.bodySmall,
+                                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                                        )
+                                    }
+                                    val statusColor = when (profile.approvalEnum) {
+                                        ApprovalStatus.APPROVED -> StatusApproved
+                                        ApprovalStatus.PENDING -> StatusPending
+                                        ApprovalStatus.REJECTED -> StatusRejected
+                                    }
+                                    Surface(
+                                        shape = RoundedCornerShape(8.dp),
+                                        color = statusColor.copy(alpha = 0.14f)
+                                    ) {
+                                        Text(
+                                            text = profile.approvalEnum.name,
+                                            style = MaterialTheme.typography.labelSmall,
+                                            fontWeight = FontWeight.Bold,
+                                            color = statusColor,
+                                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                        )
+                                    }
+                                }
+
+                                if (profile.approvalEnum == ApprovalStatus.APPROVED) {
+                                    if (hasPendingTransfer) {
+                                        Text(
+                                            text = "বদলির আবেদনটি অ্যাডমিনের অনুমোদনের অপেক্ষায় আছে।",
+                                            style = MaterialTheme.typography.labelMedium,
+                                            color = StatusPending,
+                                            fontWeight = FontWeight.SemiBold
+                                        )
+                                    } else {
+                                        FilledTonalButton(
+                                            onClick = { onRequestTransfer(profile) },
+                                            modifier = Modifier
+                                                .fillMaxWidth()
+                                                .testTag("my_profile_transfer_btn_${profile.id}")
+                                        ) {
+                                            Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                                            Spacer(Modifier.width(6.dp))
+                                            Text("Request Hospital Transfer (বদলি আবেদন)")
+                                        }
+                                    }
+                                } else if (profile.approvalEnum == ApprovalStatus.REJECTED && profile.rejectionReason.isNotBlank()) {
+                                    Text(
+                                        text = "Reason: ${profile.rejectionReason}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = StatusRejected
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    if (myTransferRequests.isNotEmpty()) {
+                        Text(
+                            text = "Transfer Request Status",
+                            style = MaterialTheme.typography.labelLarge,
+                            fontWeight = FontWeight.SemiBold,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        myTransferRequests.forEach { req ->
+                            val reqColor = when (req.statusEnum) {
+                                TransferStatus.APPROVED -> StatusApproved
+                                TransferStatus.PENDING -> StatusPending
+                                TransferStatus.REJECTED -> StatusRejected
+                            }
+                            Surface(
+                                shape = MaterialTheme.shapes.medium,
+                                color = MaterialTheme.colorScheme.surfaceContainerLow,
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .testTag("my_transfer_card_${req.id}")
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(12.dp),
+                                    verticalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Text(
+                                            text = req.nurseName,
+                                            style = MaterialTheme.typography.titleSmall,
+                                            fontWeight = FontWeight.Bold
+                                        )
+                                        Surface(
+                                            shape = RoundedCornerShape(8.dp),
+                                            color = reqColor.copy(alpha = 0.14f)
+                                        ) {
+                                            Text(
+                                                text = req.statusEnum.name,
+                                                style = MaterialTheme.typography.labelSmall,
+                                                fontWeight = FontWeight.Bold,
+                                                color = reqColor,
+                                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                                            )
+                                        }
+                                    }
+                                    Text(
+                                        text = "${req.currentHospitalName} ➔ ${req.newHospitalName}",
+                                        style = MaterialTheme.typography.bodySmall,
+                                        fontWeight = FontWeight.Medium
+                                    )
+                                    Text(
+                                        text = "${req.newUpazila}, ${req.newDistrict}, ${req.newDivision}",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
+                                    )
+                                    if (req.statusEnum == TransferStatus.REJECTED && req.rejectionReason.isNotBlank()) {
+                                        Text(
+                                            text = "Reason: ${req.rejectionReason}",
+                                            style = MaterialTheme.typography.labelSmall,
+                                            color = StatusRejected
+                                        )
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }

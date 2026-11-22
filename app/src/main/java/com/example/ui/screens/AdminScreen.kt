@@ -19,16 +19,21 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
 import androidx.compose.material.icons.filled.AddModerator
 import androidx.compose.material.icons.filled.Analytics
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Groups
 import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.HowToReg
 import androidx.compose.material.icons.filled.Map
 import androidx.compose.material.icons.filled.PendingActions
 import androidx.compose.material.icons.filled.PersonAdd
+import androidx.compose.material.icons.filled.Search
 import androidx.compose.material.icons.filled.Security
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
@@ -68,11 +73,15 @@ import com.example.data.AdminEntity
 import com.example.data.AdminRole
 import com.example.data.ApprovalStatus
 import com.example.data.BangladeshData
+import com.example.data.LiveNoticeEntity
 import com.example.data.NurseEntity
+import com.example.data.TransferRequestEntity
+import com.example.data.TransferStatus
 import com.example.ui.AdminSessionState
 import com.example.ui.AnalyticsSummary
 import com.example.ui.components.ApprovalFunnelCard
 import com.example.ui.components.DivisionBarChartCard
+import com.example.ui.components.PublishLiveNoticeDialog
 import com.example.ui.components.SpecialtyDonutChartCard
 import com.example.ui.theme.StatusApproved
 import com.example.ui.theme.StatusPending
@@ -84,10 +93,16 @@ fun AdminScreen(
     session: AdminSessionState,
     analytics: AnalyticsSummary,
     allNurses: List<NurseEntity>,
+    transferRequests: List<TransferRequestEntity> = emptyList(),
+    liveNotice: LiveNoticeEntity? = null,
     onSignOutAndSwitch: () -> Unit,
     onApproveNurse: (NurseEntity, (Result<Unit>) -> Unit) -> Unit,
     onRejectNurse: (NurseEntity, String, (Result<Unit>) -> Unit) -> Unit,
+    onEditNurse: (NurseEntity) -> Unit = {},
     onDeleteNurse: (String, (Result<Unit>) -> Unit) -> Unit,
+    onApproveTransfer: (TransferRequestEntity, (Result<Unit>) -> Unit) -> Unit = { _, cb -> cb(Result.success(Unit)) },
+    onRejectTransfer: (TransferRequestEntity, String, (Result<Unit>) -> Unit) -> Unit = { _, _, cb -> cb(Result.success(Unit)) },
+    onPublishLiveNotice: (String, String, Boolean, (Result<Unit>) -> Unit) -> Unit = { _, _, _, cb -> cb(Result.success(Unit)) },
     onAddAdmin: (String, String, AdminRole, String, (Result<Unit>) -> Unit) -> Unit,
     onRemoveAdmin: (AdminEntity, (Result<Unit>) -> Unit) -> Unit,
     onShowMessage: (String) -> Unit,
@@ -107,10 +122,17 @@ fun AdminScreen(
 
     var selectedTab by remember { mutableIntStateOf(0) }
     var approvalFilter by remember { mutableStateOf(ApprovalStatus.PENDING) }
+    var transferFilter by remember { mutableStateOf(TransferStatus.PENDING) }
     var nurseToReject by remember { mutableStateOf<NurseEntity?>(null) }
     var nurseToDelete by remember { mutableStateOf<NurseEntity?>(null) }
+    var transferToReject by remember { mutableStateOf<TransferRequestEntity?>(null) }
     var showAddAdminDialog by remember { mutableStateOf(false) }
+    var showLiveNoticeDialog by remember { mutableStateOf(false) }
     var adminToRemove by remember { mutableStateOf<AdminEntity?>(null) }
+
+    val pendingTransfersCount = remember(transferRequests) {
+        transferRequests.count { it.statusEnum == TransferStatus.PENDING }
+    }
 
     Column(modifier = modifier.fillMaxSize()) {
         // Logged-in Admin Bar
@@ -173,7 +195,7 @@ fun AdminScreen(
                 selected = selectedTab == 0,
                 onClick = { selectedTab = 0 },
                 icon = { Icon(Icons.Filled.Analytics, contentDescription = null) },
-                text = { Text("Analytics") },
+                text = { Text("Overview", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 modifier = Modifier.testTag("admin_tab_analytics")
             )
             Tab(
@@ -190,14 +212,31 @@ fun AdminScreen(
                         Icon(Icons.Filled.PendingActions, contentDescription = null)
                     }
                 },
-                text = { Text("Approvals") },
+                text = { Text("Nurses", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 modifier = Modifier.testTag("admin_tab_approvals")
             )
             Tab(
                 selected = selectedTab == 2,
                 onClick = { selectedTab = 2 },
+                icon = {
+                    BadgedBox(
+                        badge = {
+                            if (pendingTransfersCount > 0) {
+                                Badge { Text("$pendingTransfersCount") }
+                            }
+                        }
+                    ) {
+                        Icon(Icons.Filled.SwapHoriz, contentDescription = null)
+                    }
+                },
+                text = { Text("Transfers", maxLines = 1, overflow = TextOverflow.Ellipsis) },
+                modifier = Modifier.testTag("admin_tab_transfers")
+            )
+            Tab(
+                selected = selectedTab == 3,
+                onClick = { selectedTab = 3 },
                 icon = { Icon(Icons.Filled.AddModerator, contentDescription = null) },
-                text = { Text("Admins") },
+                text = { Text("Admins", maxLines = 1, overflow = TextOverflow.Ellipsis) },
                 modifier = Modifier.testTag("admin_tab_admins")
             )
         }
@@ -206,6 +245,8 @@ fun AdminScreen(
             0 -> AdminDashboardScreen(
                 analytics = analytics,
                 pendingNurses = allNurses.filter { it.approvalEnum == ApprovalStatus.PENDING },
+                pendingTransfersCount = pendingTransfersCount,
+                liveNotice = liveNotice,
                 onApprove = { nurse ->
                     onApproveNurse(nurse) { res ->
                         res.onSuccess { onShowMessage("${nurse.fullName} approved & published!") }
@@ -216,7 +257,16 @@ fun AdminScreen(
                 onOpenApprovals = {
                     approvalFilter = ApprovalStatus.PENDING
                     selectedTab = 1
-                }
+                },
+                onOpenApprovedEdit = {
+                    approvalFilter = ApprovalStatus.APPROVED
+                    selectedTab = 1
+                },
+                onOpenTransfers = {
+                    transferFilter = TransferStatus.PENDING
+                    selectedTab = 2
+                },
+                onOpenLiveNotice = { showLiveNoticeDialog = true }
             )
             1 -> ApprovalsQueueTab(
                 allNurses = allNurses,
@@ -228,10 +278,23 @@ fun AdminScreen(
                             .onFailure { onShowMessage(it.message ?: "Approval failed") }
                     }
                 },
+                onEdit = onEditNurse,
                 onRequestReject = { nurseToReject = it },
                 onRequestDelete = { nurseToDelete = it }
             )
-            2 -> AdminManagementTab(
+            2 -> TransfersQueueTab(
+                requests = transferRequests,
+                selectedStatus = transferFilter,
+                onSelectStatus = { transferFilter = it },
+                onApproveTransfer = { req ->
+                    onApproveTransfer(req) { res ->
+                        res.onSuccess { onShowMessage("${req.nurseName} transferred to ${req.newHospitalName}!") }
+                            .onFailure { onShowMessage(it.message ?: "Transfer approval failed") }
+                    }
+                },
+                onRequestReject = { transferToReject = it }
+            )
+            3 -> AdminManagementTab(
                 admins = session.admins,
                 currentAdminEmail = activeAdmin.email,
                 isSuperAdmin = session.isSuperAdmin,
@@ -334,6 +397,72 @@ fun AdminScreen(
         )
     }
 
+    // Reject Transfer Confirmation
+    transferToReject?.let { req ->
+        var reason by remember { mutableStateOf("") }
+        AlertDialog(
+            onDismissRequest = { transferToReject = null },
+            title = { Text("Reject Transfer Request") },
+            text = {
+                Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Text(
+                        text = "Reject ${req.nurseName}'s transfer request to ${req.newHospitalName}?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                    OutlinedTextField(
+                        value = reason,
+                        onValueChange = { reason = it },
+                        label = { Text("Reason (Optional)") },
+                        placeholder = { Text("e.g., Transfer order verification pending") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        onRejectTransfer(req, reason) { res ->
+                            res.onSuccess { onShowMessage("Transfer request rejected") }
+                                .onFailure { onShowMessage(it.message ?: "Action failed") }
+                        }
+                        transferToReject = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Reject")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { transferToReject = null }) {
+                    Text("Cancel")
+                }
+            }
+        )
+    }
+
+    if (showLiveNoticeDialog) {
+        PublishLiveNoticeDialog(
+            currentNotice = liveNotice,
+            onDismiss = { showLiveNoticeDialog = false },
+            onPublish = { title, message, active, onError ->
+                onPublishLiveNotice(title, message, active) { res ->
+                    res.onSuccess {
+                        showLiveNoticeDialog = false
+                        onShowMessage(
+                            if (active) "Live broadcast updated across all phones!"
+                            else "Live broadcast banner turned off"
+                        )
+                    }.onFailure { err ->
+                        onError(err.message ?: "Could not publish live notice")
+                    }
+                }
+            }
+        )
+    }
+
     // Remove Admin Confirmation
     adminToRemove?.let { target ->
         AlertDialog(
@@ -371,9 +500,14 @@ fun AdminScreen(
 fun AdminDashboardScreen(
     analytics: AnalyticsSummary,
     pendingNurses: List<NurseEntity>,
+    pendingTransfersCount: Int = 0,
+    liveNotice: LiveNoticeEntity? = null,
     onApprove: (NurseEntity) -> Unit,
     onRequestDelete: (NurseEntity) -> Unit,
     onOpenApprovals: () -> Unit,
+    onOpenApprovedEdit: () -> Unit = {},
+    onOpenTransfers: () -> Unit = {},
+    onOpenLiveNotice: () -> Unit = {},
     modifier: Modifier = Modifier
 ) {
     LazyColumn(
@@ -398,11 +532,12 @@ fun AdminDashboardScreen(
                             .testTag("kpi_total_registered")
                     )
                     KpiCard(
-                        title = "Active Nurses",
+                        title = "Approved Nurses",
                         value = analytics.totalApproved.toString(),
-                        subtitle = "${analytics.divisionsCovered}/8 Divisions",
+                        subtitle = "Tap to Edit / Delete",
                         icon = Icons.Filled.HowToReg,
                         accentColor = StatusApproved,
+                        onClick = onOpenApprovedEdit,
                         modifier = Modifier
                             .weight(1f)
                             .testTag("kpi_active_nurses")
@@ -425,13 +560,63 @@ fun AdminDashboardScreen(
                             .testTag("kpi_pending_approvals")
                     )
                     KpiCard(
-                        title = "Emergency Ready",
-                        value = analytics.emergencyReadyCount.toString(),
-                        subtitle = "${analytics.totalAdmins} Active Admins",
-                        icon = Icons.Filled.HealthAndSafety,
+                        title = "Transfer Requests",
+                        value = pendingTransfersCount.toString(),
+                        subtitle = "Tap to approve moves",
+                        icon = Icons.Filled.SwapHoriz,
                         accentColor = MaterialTheme.colorScheme.tertiary,
-                        modifier = Modifier.weight(1f)
+                        onClick = onOpenTransfers,
+                        modifier = Modifier
+                            .weight(1f)
+                            .testTag("kpi_pending_transfers")
                     )
+                }
+            }
+        }
+
+        item {
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                shape = MaterialTheme.shapes.large,
+                colors = CardDefaults.cardColors(
+                    containerColor = MaterialTheme.colorScheme.secondaryContainer
+                )
+            ) {
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .padding(14.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        Text(
+                            text = "Live Broadcast Update",
+                            style = MaterialTheme.typography.titleSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer
+                        )
+                        Text(
+                            text = if (liveNotice?.active == true) {
+                                "Active: ${liveNotice.title.ifBlank { liveNotice.message }}"
+                            } else {
+                                "অ্যাপ ডাউনলোড ছাড়াই সবার ফোনে তাৎক্ষণিক তথ্য আপডেট পাঠান"
+                            },
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer,
+                            maxLines = 2,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
+                    Spacer(Modifier.width(10.dp))
+                    FilledTonalButton(
+                        onClick = onOpenLiveNotice,
+                        modifier = Modifier.testTag("admin_live_notice_button")
+                    ) {
+                        Icon(Icons.Filled.Campaign, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(6.dp))
+                        Text("Broadcast")
+                    }
                 }
             }
         }
@@ -622,11 +807,23 @@ private fun ApprovalsQueueTab(
     selectedStatus: ApprovalStatus,
     onSelectStatus: (ApprovalStatus) -> Unit,
     onApprove: (NurseEntity) -> Unit,
+    onEdit: (NurseEntity) -> Unit,
     onRequestReject: (NurseEntity) -> Unit,
     onRequestDelete: (NurseEntity) -> Unit
 ) {
-    val filtered = remember(allNurses, selectedStatus) {
-        allNurses.filter { it.approvalEnum == selectedStatus }
+    var searchQuery by remember { mutableStateOf("") }
+    val filtered = remember(allNurses, selectedStatus, searchQuery) {
+        val q = searchQuery.trim().lowercase()
+        allNurses.filter { nurse ->
+            val matchesStatus = nurse.approvalEnum == selectedStatus
+            val matchesSearch = q.isEmpty() ||
+                nurse.fullName.lowercase().contains(q) ||
+                nurse.bnmcNumber.lowercase().contains(q) ||
+                nurse.hospitalName.lowercase().contains(q) ||
+                nurse.phone.contains(q) ||
+                nurse.district.lowercase().contains(q)
+            matchesStatus && matchesSearch
+        }
     }
     val pendingCount = allNurses.count { it.approvalEnum == ApprovalStatus.PENDING }
     val approvedCount = allNurses.count { it.approvalEnum == ApprovalStatus.APPROVED }
@@ -637,6 +834,26 @@ private fun ApprovalsQueueTab(
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp)
     ) {
+        item {
+            OutlinedTextField(
+                value = searchQuery,
+                onValueChange = { searchQuery = it },
+                placeholder = { Text("Search nurse by name, BNMC, hospital, phone...") },
+                leadingIcon = { Icon(Icons.Filled.Search, contentDescription = null) },
+                trailingIcon = {
+                    if (searchQuery.isNotEmpty()) {
+                        IconButton(onClick = { searchQuery = "" }) {
+                            Icon(Icons.Filled.Clear, contentDescription = "Clear")
+                        }
+                    }
+                },
+                singleLine = true,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .testTag("admin_nurses_search_input")
+            )
+        }
+
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                 FilterChip(
@@ -679,7 +896,7 @@ private fun ApprovalsQueueTab(
                         )
                         Spacer(Modifier.height(10.dp))
                         Text(
-                            text = "No ${selectedStatus.name.lowercase()} applications",
+                            text = "No ${selectedStatus.name.lowercase()} nurses found",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.SemiBold
                         )
@@ -741,8 +958,13 @@ private fun ApprovalsQueueTab(
                             }
                         }
 
+                        val loc = listOfNotNull(
+                            nurse.upazila.takeIf { it.isNotBlank() },
+                            nurse.district.takeIf { it.isNotBlank() },
+                            nurse.division.takeIf { it.isNotBlank() }
+                        ).joinToString(", ")
                         Text(
-                            text = "${nurse.hospitalName} (${nurse.district}, ${nurse.division})",
+                            text = "${nurse.hospitalName} ($loc)",
                             style = MaterialTheme.typography.bodyMedium
                         )
                         Text(
@@ -791,6 +1013,16 @@ private fun ApprovalsQueueTab(
                                     Text("Reject")
                                 }
                             }
+                            FilledTonalButton(
+                                onClick = { onEdit(nurse) },
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .testTag("edit_nurse_${nurse.id}")
+                            ) {
+                                Icon(Icons.Filled.Edit, contentDescription = "Edit ${nurse.fullName}", modifier = Modifier.size(16.dp))
+                                Spacer(Modifier.width(4.dp))
+                                Text("Edit")
+                            }
                             OutlinedButton(
                                 onClick = { onRequestDelete(nurse) },
                                 modifier = Modifier.testTag("delete_nurse_${nurse.id}"),
@@ -801,6 +1033,190 @@ private fun ApprovalsQueueTab(
                                 Icon(Icons.Filled.DeleteOutline, contentDescription = "Delete ${nurse.fullName}", modifier = Modifier.size(16.dp))
                                 Spacer(Modifier.width(4.dp))
                                 Text("Delete")
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun TransfersQueueTab(
+    requests: List<TransferRequestEntity>,
+    selectedStatus: TransferStatus,
+    onSelectStatus: (TransferStatus) -> Unit,
+    onApproveTransfer: (TransferRequestEntity) -> Unit,
+    onRequestReject: (TransferRequestEntity) -> Unit
+) {
+    val filtered = remember(requests, selectedStatus) {
+        requests.filter { it.statusEnum == selectedStatus }
+    }
+    val pendingCount = requests.count { it.statusEnum == TransferStatus.PENDING }
+    val approvedCount = requests.count { it.statusEnum == TransferStatus.APPROVED }
+    val rejectedCount = requests.count { it.statusEnum == TransferStatus.REJECTED }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize(),
+        contentPadding = PaddingValues(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                FilterChip(
+                    selected = selectedStatus == TransferStatus.PENDING,
+                    onClick = { onSelectStatus(TransferStatus.PENDING) },
+                    label = { Text("Pending ($pendingCount)") }
+                )
+                FilterChip(
+                    selected = selectedStatus == TransferStatus.APPROVED,
+                    onClick = { onSelectStatus(TransferStatus.APPROVED) },
+                    label = { Text("Approved ($approvedCount)") }
+                )
+                FilterChip(
+                    selected = selectedStatus == TransferStatus.REJECTED,
+                    onClick = { onSelectStatus(TransferStatus.REJECTED) },
+                    label = { Text("Rejected ($rejectedCount)") }
+                )
+            }
+        }
+
+        if (filtered.isEmpty()) {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLow
+                    )
+                ) {
+                    Column(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(28.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.SwapHoriz,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(40.dp)
+                        )
+                        Spacer(Modifier.height(10.dp))
+                        Text(
+                            text = "No ${selectedStatus.name.lowercase()} transfer requests",
+                            style = MaterialTheme.typography.titleMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                    }
+                }
+            }
+        } else {
+            items(filtered, key = { it.id }) { req ->
+                val statusColor = when (req.statusEnum) {
+                    TransferStatus.APPROVED -> StatusApproved
+                    TransferStatus.PENDING -> StatusPending
+                    TransferStatus.REJECTED -> StatusRejected
+                }
+                Card(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .testTag("transfer_card_${req.id}"),
+                    shape = MaterialTheme.shapes.large,
+                    colors = CardDefaults.cardColors(
+                        containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
+                    ),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+                ) {
+                    Column(
+                        modifier = Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(
+                            modifier = Modifier.fillMaxWidth(),
+                            horizontalArrangement = Arrangement.SpaceBetween,
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Column(modifier = Modifier.weight(1f)) {
+                                Text(
+                                    text = req.nurseName,
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.Bold
+                                )
+                                Text(
+                                    text = req.bnmcNumber,
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.primary
+                                )
+                            }
+                            Surface(
+                                shape = RoundedCornerShape(8.dp),
+                                color = statusColor.copy(alpha = 0.14f)
+                            ) {
+                                Text(
+                                    text = req.statusEnum.name,
+                                    style = MaterialTheme.typography.labelSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = statusColor,
+                                    modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                                )
+                            }
+                        }
+
+                        Text(
+                            text = "From: ${req.currentHospitalName} (${req.currentUpazila}, ${req.currentDistrict})",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant
+                        )
+                        Text(
+                            text = "To: ${req.newHospitalName} (${req.newUpazila}, ${req.newDistrict}, ${req.newDivision})",
+                            style = MaterialTheme.typography.bodyMedium,
+                            fontWeight = FontWeight.SemiBold
+                        )
+                        if (req.transferNote.isNotBlank()) {
+                            Text(
+                                text = "Note: ${req.transferNote}",
+                                style = MaterialTheme.typography.bodySmall,
+                                color = MaterialTheme.colorScheme.onSurfaceVariant
+                            )
+                        }
+                        if (req.rejectionReason.isNotBlank() && req.statusEnum == TransferStatus.REJECTED) {
+                            Text(
+                                text = "Rejection reason: ${req.rejectionReason}",
+                                style = MaterialTheme.typography.labelMedium,
+                                color = StatusRejected
+                            )
+                        }
+
+                        if (req.statusEnum == TransferStatus.PENDING) {
+                            Spacer(Modifier.height(4.dp))
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Button(
+                                    onClick = { onApproveTransfer(req) },
+                                    modifier = Modifier
+                                        .weight(1.4f)
+                                        .testTag("approve_transfer_${req.id}")
+                                ) {
+                                    Icon(Icons.Filled.Check, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Approve & Update")
+                                }
+                                OutlinedButton(
+                                    onClick = { onRequestReject(req) },
+                                    modifier = Modifier
+                                        .weight(1f)
+                                        .testTag("reject_transfer_${req.id}"),
+                                    colors = ButtonDefaults.outlinedButtonColors(
+                                        contentColor = MaterialTheme.colorScheme.error
+                                    )
+                                ) {
+                                    Icon(Icons.Filled.Close, contentDescription = null, modifier = Modifier.size(16.dp))
+                                    Spacer(Modifier.width(4.dp))
+                                    Text("Reject")
+                                }
                             }
                         }
                     }

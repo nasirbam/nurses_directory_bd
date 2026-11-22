@@ -22,6 +22,8 @@ import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.Call
 import androidx.compose.material.icons.filled.ContentCopy
+import androidx.compose.material.icons.filled.DeleteOutline
+import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Email
 import androidx.compose.material.icons.filled.LocalHospital
 import androidx.compose.material.icons.filled.LocationOn
@@ -29,8 +31,10 @@ import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.School
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.Sms
+import androidx.compose.material.icons.filled.SwapHoriz
 import androidx.compose.material.icons.filled.Verified
 import androidx.compose.material.icons.filled.WorkHistory
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Button
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.FilledTonalButton
@@ -58,7 +62,12 @@ import com.example.ui.ContactActions
 @Composable
 fun NurseDetailBottomSheet(
     nurse: NurseEntity,
-    onDismiss: () -> Unit
+    onDismiss: () -> Unit,
+    canEditAsAdmin: Boolean = false,
+    canRequestTransfer: Boolean = false,
+    onEditClick: () -> Unit = {},
+    onDeleteClick: () -> Unit = {},
+    onRequestTransferClick: () -> Unit = {}
 ) {
     val context = LocalContext.current
     val sheetState = rememberModalBottomSheetState(skipPartiallyExpanded = true)
@@ -265,6 +274,57 @@ fun NurseDetailBottomSheet(
                             style = MaterialTheme.typography.bodyMedium,
                             color = MaterialTheme.colorScheme.onSurface
                         )
+                    }
+                }
+            }
+
+            if (canRequestTransfer || canEditAsAdmin) {
+                Spacer(modifier = Modifier.height(16.dp))
+                HorizontalDivider(color = MaterialTheme.colorScheme.outlineVariant)
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (canRequestTransfer) {
+                    FilledTonalButton(
+                        onClick = onRequestTransferClick,
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("detail_request_transfer_button")
+                    ) {
+                        Icon(Icons.Filled.SwapHoriz, contentDescription = null, modifier = Modifier.size(18.dp))
+                        Spacer(Modifier.width(8.dp))
+                        Text("Request Hospital Transfer (বদলি আবেদন)")
+                    }
+                }
+
+                if (canEditAsAdmin) {
+                    if (canRequestTransfer) Spacer(modifier = Modifier.height(8.dp))
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    ) {
+                        FilledTonalButton(
+                            onClick = onEditClick,
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("detail_admin_edit_button")
+                        ) {
+                            Icon(Icons.Filled.Edit, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Edit Nurse")
+                        }
+                        OutlinedButton(
+                            onClick = onDeleteClick,
+                            colors = ButtonDefaults.outlinedButtonColors(
+                                contentColor = MaterialTheme.colorScheme.error
+                            ),
+                            modifier = Modifier
+                                .weight(1f)
+                                .testTag("detail_admin_delete_button")
+                        ) {
+                            Icon(Icons.Filled.DeleteOutline, contentDescription = null, modifier = Modifier.size(18.dp))
+                            Spacer(Modifier.width(6.dp))
+                            Text("Delete")
+                        }
                     }
                 }
             }

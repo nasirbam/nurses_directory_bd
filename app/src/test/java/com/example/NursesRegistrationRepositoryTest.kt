@@ -5,9 +5,12 @@ import com.example.data.AdminRole
 import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.LiveNoticeEntity
 import com.example.data.NurseEntity
 import com.example.data.NursesRepository
 import com.example.data.SecurityUtils
+import com.example.data.TransferRequestEntity
+import com.example.data.TransferStatus
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -25,6 +28,25 @@ class NursesRegistrationRepositoryTest {
         )
         assertEquals(ApprovalStatus.PENDING, unknownNurse.approvalEnum)
         assertEquals(AvailabilityStatus.ON_DUTY, unknownNurse.availabilityEnum)
+    }
+
+    @Test
+    fun transferRequestAndLiveNotice_safeDefaultsAndEnumFallback() {
+        val unknownTransfer = TransferRequestEntity(
+            nurseId = "nurse_1",
+            nurseName = "Nusrat Jahan",
+            currentHospitalName = "DMCH",
+            newHospitalName = "CMCH",
+            status = "UNEXPECTED_STATUS"
+        )
+        assertEquals(TransferStatus.PENDING, unknownTransfer.statusEnum)
+
+        val approvedTransfer = unknownTransfer.copy(status = TransferStatus.APPROVED.name)
+        assertEquals(TransferStatus.APPROVED, approvedTransfer.statusEnum)
+
+        val defaultNotice = LiveNoticeEntity()
+        assertFalse(defaultNotice.active)
+        assertEquals("", defaultNotice.title)
     }
 
     @Test

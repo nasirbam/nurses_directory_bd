@@ -26,6 +26,9 @@ import androidx.compose.material.icons.filled.PersonAddAlt1
 import androidx.compose.material.icons.outlined.AdminPanelSettings
 import androidx.compose.material.icons.outlined.Groups
 import androidx.compose.material.icons.outlined.PersonAddAlt1
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Badge
 import androidx.compose.material3.BadgedBox
 import androidx.compose.material3.CenterAlignedTopAppBar
@@ -72,12 +75,17 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.currentBackStackEntryAsState
 import androidx.navigation.compose.rememberNavController
+import com.example.data.ApprovalStatus
+import com.example.data.NurseEntity
 import com.example.data.NursesRepository
+import com.example.data.TransferStatus
 import com.example.ui.NursesViewModel
 import com.example.ui.auth.attemptAutoSignIn
 import com.example.ui.auth.authStateFlow
 import com.example.ui.auth.signOut
+import com.example.ui.components.EditNurseDialog
 import com.example.ui.components.NurseDetailBottomSheet
+import com.example.ui.components.RequestTransferDialog
 import com.example.ui.screens.AdminAuthGate
 import com.example.ui.screens.AdminScreen
 import com.example.ui.screens.DirectoryScreen
@@ -299,10 +307,20 @@ fun NursesBDApp(
     val analyticsState by viewModel.analyticsSummary.collectAsStateWithLifecycle()
     val adminSession by viewModel.adminSessionState.collectAsStateWithLifecycle()
     val allNurses by viewModel.allNurses.collectAsStateWithLifecycle()
+    val mySubmissions by viewModel.mySubmissions.collectAsStateWithLifecycle()
+    val myTransferRequests by viewModel.myTransferRequests.collectAsStateWithLifecycle()
+    val adminTransferRequests by viewModel.adminTransferRequests.collectAsStateWithLifecycle()
+    val liveNotice by viewModel.liveNotice.collectAsStateWithLifecycle()
     val selectedNurse by viewModel.selectedNurse.collectAsStateWithLifecycle()
+
+    var nurseToEdit by remember { mutableStateOf<NurseEntity?>(null) }
+    var nurseForTransfer by remember { mutableStateOf<NurseEntity?>(null) }
+    var nurseToDeleteFromDetail by remember { mutableStateOf<NurseEntity?>(null) }
 
     val snackbarHostState = remember { SnackbarHostState() }
     val coroutineScope = rememberCoroutineScope()
+    val adminBadgeCount = analyticsState.totalPending +
+        adminTransferRequests.count { it.statusEnum == TransferStatus.PENDING }
 
     val navController = rememberNavController()
     val navBackStackEntry by navController.currentBackStackEntryAsState()
@@ -375,7 +393,7 @@ fun NursesBDApp(
                                 NavIconWithBadge(
                                     item = item,
                                     selected = selected,
-                                    pendingCount = if (adminSession.isAuthorizedAdmin) analyticsState.totalPending else 0
+                                    pendingCount = if (adminSession.isAuthorizedAdmin) adminBadgeCount else 0
                                 )
                             },
                             label = { Text(item.label) },
@@ -441,7 +459,7 @@ fun NursesBDApp(
                                         NavIconWithBadge(
                                             item = item,
                                             selected = selected,
-                                            pendingCount = if (adminSession.isAuthorizedAdmin) analyticsState.totalPending else 0
+                                            pendingCount = if (adminSession.isAuthorizedAdmin) adminBadgeCount else 0
                                         )
                                     },
                                     label = { Text(item.label) },
@@ -464,6 +482,7 @@ fun NursesBDApp(
                         composable(Routes.DIRECTORY) {
                             DirectoryScreen(
                                 uiState = directoryState,
+                                liveNotice = liveNotice,
                                 onSearchQueryChange = viewModel::updateSearchQuery,
                                 onSelectDivision = viewModel::selectDivisionFilter,
                                 onSelectDistrict = viewModel::selectDistrictFilter,
@@ -490,6 +509,9 @@ fun NursesBDApp(
                             RegisterScreen(
                                 isSignedIn = true,
                                 signedInEmail = viewModel.currentUserEmail,
+                                mySubmissions = mySubmissions,
+                                myTransferRequests = myTransferRequests,
+                                onRequestTransfer = { nurseForTransfer = it },
                                 onSubmitRegistration = { nurse, cb ->
                                     viewModel.submitRegistration(nurse, cb)
                                 },
@@ -503,10 +525,16 @@ fun NursesBDApp(
                                 session = adminSession,
                                 analytics = analyticsState,
                                 allNurses = allNurses,
+                                transferRequests = adminTransferRequests,
+                                liveNotice = liveNotice,
                                 onSignOutAndSwitch = onSignOut,
                                 onApproveNurse = viewModel::approveNurse,
                                 onRejectNurse = viewModel::rejectNurse,
+                                onEditNurse = { nurseToEdit = it },
                                 onDeleteNurse = viewModel::deleteNurse,
+                                onApproveTransfer = viewModel::approveTransferRequest,
+                                onRejectTransfer = viewModel::rejectTransferRequest,
+                                onPublishLiveNotice = viewModel::publishLiveNotice,
                                 onAddAdmin = viewModel::addAdmin,
                                 onRemoveAdmin = viewModel::removeAdmin,
                                 onShowMessage = { msg ->
@@ -523,9 +551,106 @@ fun NursesBDApp(
     }
 
     selectedNurse?.let { nurse ->
+        val isOwnApproved = nurse.submittedByUid == viewModel.currentUserId &&
+            nurse.approvalEnum == ApprovalStatus.APPROVED
         NurseDetailBottomSheet(
             nurse = nurse,
-            onDismiss = viewModel::closeNurseDetail
+            onDismiss = viewModel::closeNurseDetail,
+            canEditAsAdmin = adminSession.isAuthorizedAdmin,
+            canRequestTransfer = isOwnApproved,
+            onEditClick = {
+                viewModel.closeNurseDetail()
+                nurseToEdit = nurse
+            },
+            onDeleteClick = {
+                viewModel.closeNurseDetail()
+                nurseToDeleteFromDetail = nurse
+            },
+            onRequestTransferClick = {
+                viewModel.closeNurseDetail()
+                nurseForTransfer = nurse
+            }
+        )
+    }
+
+    nurseToEdit?.let { target ->
+        EditNurseDialog(
+            nurse = target,
+            onDismiss = { nurseToEdit = null },
+            onSave = { updated, onError ->
+                viewModel.updateNurseByAdmin(updated) { res ->
+                    res.onSuccess {
+                        nurseToEdit = null
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("${updated.fullName}'s profile updated live!")
+                        }
+                    }.onFailure { err ->
+                        onError(err.message ?: "Failed to update nurse profile")
+                    }
+                }
+            }
+        )
+    }
+
+    nurseForTransfer?.let { target ->
+        RequestTransferDialog(
+            nurse = target,
+            onDismiss = { nurseForTransfer = null },
+            onSubmit = { newDiv, newDist, newUpazila, newHospital, note, onError ->
+                viewModel.submitTransferRequest(
+                    nurse = target,
+                    newDivision = newDiv,
+                    newDistrict = newDist,
+                    newUpazila = newUpazila,
+                    newHospitalName = newHospital,
+                    transferNote = note
+                ) { res ->
+                    res.onSuccess {
+                        nurseForTransfer = null
+                        coroutineScope.launch {
+                            snackbarHostState.showSnackbar("Transfer request sent for Admin approval!")
+                        }
+                    }.onFailure { err ->
+                        onError(err.message ?: "Could not submit transfer request")
+                    }
+                }
+            }
+        )
+    }
+
+    nurseToDeleteFromDetail?.let { target ->
+        AlertDialog(
+            onDismissRequest = { nurseToDeleteFromDetail = null },
+            title = { Text("Remove Nurse Record?") },
+            text = { Text("Remove ${target.fullName} permanently from the directory?") },
+            confirmButton = {
+                Button(
+                    onClick = {
+                        viewModel.deleteNurse(target.id) { res ->
+                            res.onSuccess {
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar("${target.fullName} removed")
+                                }
+                            }.onFailure { err ->
+                                coroutineScope.launch {
+                                    snackbarHostState.showSnackbar(err.message ?: "Delete failed")
+                                }
+                            }
+                        }
+                        nurseToDeleteFromDetail = null
+                    },
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = MaterialTheme.colorScheme.error
+                    )
+                ) {
+                    Text("Remove")
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { nurseToDeleteFromDetail = null }) {
+                    Text("Cancel")
+                }
+            }
         )
     }
 }

@@ -9,8 +9,11 @@ import com.example.data.AdminRole
 import com.example.data.ApprovalStatus
 import com.example.data.AvailabilityStatus
 import com.example.data.BangladeshData
+import com.example.data.LiveNoticeEntity
 import com.example.data.NurseEntity
 import com.example.data.NursesRepository
+import com.example.data.TransferRequestEntity
+import com.example.data.TransferStatus
 import com.google.firebase.firestore.FirebaseFirestoreException
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
@@ -191,9 +194,57 @@ class NursesViewModel(
             initialValue = UiState.Loading
         )
 
+    private val myTransferRequestsState: StateFlow<UiState<List<TransferRequestEntity>>> =
+        repository.observeMyTransferRequests(currentUserId)
+            .toSafeUiStateFlow("Failed to load transfer requests")
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = UiState.Loading
+            )
+
+    private val adminTransferRequestsState: StateFlow<UiState<List<TransferRequestEntity>>> =
+        isAdminFlow.flatMapLatest { isAdmin ->
+            if (!isAdmin) {
+                flowOf(UiState.Success(emptyList()))
+            } else {
+                repository.observeAllTransferRequestsForAdmin()
+                    .toSafeUiStateFlow("Failed to load transfer request queue")
+            }
+        }.stateIn(
+            scope = viewModelScope,
+            started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+            initialValue = UiState.Loading
+        )
+
+    private val liveNoticeState: StateFlow<UiState<LiveNoticeEntity?>> =
+        repository.observeLiveNotice()
+            .toSafeUiStateFlow("Failed to load live notice")
+            .stateIn(
+                scope = viewModelScope,
+                started = SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS),
+                initialValue = UiState.Loading
+            )
+
     val allNurses: StateFlow<List<NurseEntity>> = adminNursesState.map { state ->
         (state as? UiState.Success)?.data ?: emptyList()
     }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val mySubmissions: StateFlow<List<NurseEntity>> = mySubmissionsState.map { state ->
+        (state as? UiState.Success)?.data ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val myTransferRequests: StateFlow<List<TransferRequestEntity>> = myTransferRequestsState.map { state ->
+        (state as? UiState.Success)?.data ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val adminTransferRequests: StateFlow<List<TransferRequestEntity>> = adminTransferRequestsState.map { state ->
+        (state as? UiState.Success)?.data ?: emptyList()
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), emptyList())
+
+    val liveNotice: StateFlow<LiveNoticeEntity?> = liveNoticeState.map { state ->
+        (state as? UiState.Success)?.data
+    }.stateIn(viewModelScope, SharingStarted.WhileSubscribed(STOP_TIMEOUT_MILLIS), null)
 
     val adminSessionState: StateFlow<AdminSessionState> = combine(
         myAdminDocState,
@@ -546,6 +597,88 @@ class NursesViewModel(
     fun deleteNurse(nurseId: String, onResult: (Result<Unit>) -> Unit) {
         viewModelScope.launch {
             val result = repository.deleteNurse(nurseId)
+            onResult(result)
+        }
+    }
+
+    fun updateNurseByAdmin(updatedNurse: NurseEntity, onResult: (Result<Unit>) -> Unit) {
+        val reviewer = adminSessionState.value.currentAdmin?.email ?: normalizedUserEmail
+        if (reviewer.isBlank()) {
+            onResult(Result.failure(IllegalStateException("Admin session required.")))
+            return
+        }
+        viewModelScope.launch {
+            val result = repository.updateNurseByAdmin(updatedNurse, reviewer)
+            if (result.isSuccess && _selectedNurse.value?.id == updatedNurse.id) {
+                _selectedNurse.value = updatedNurse
+            }
+            onResult(result)
+        }
+    }
+
+    fun submitTransferRequest(
+        nurse: NurseEntity,
+        newDivision: String,
+        newDistrict: String,
+        newUpazila: String,
+        newHospitalName: String,
+        transferNote: String,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        viewModelScope.launch {
+            val result = repository.submitTransferRequest(
+                nurse = nurse,
+                newDivision = newDivision,
+                newDistrict = newDistrict,
+                newUpazila = newUpazila,
+                newHospitalName = newHospitalName,
+                transferNote = transferNote
+            )
+            onResult(result)
+        }
+    }
+
+    fun approveTransferRequest(request: TransferRequestEntity, onResult: (Result<Unit>) -> Unit) {
+        val reviewer = adminSessionState.value.currentAdmin?.email ?: normalizedUserEmail
+        if (reviewer.isBlank()) {
+            onResult(Result.failure(IllegalStateException("Admin session required.")))
+            return
+        }
+        viewModelScope.launch {
+            val result = repository.approveTransferRequest(request, reviewer)
+            onResult(result)
+        }
+    }
+
+    fun rejectTransferRequest(
+        request: TransferRequestEntity,
+        reason: String,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        val reviewer = adminSessionState.value.currentAdmin?.email ?: normalizedUserEmail
+        if (reviewer.isBlank()) {
+            onResult(Result.failure(IllegalStateException("Admin session required.")))
+            return
+        }
+        viewModelScope.launch {
+            val result = repository.rejectTransferRequest(request, reason, reviewer)
+            onResult(result)
+        }
+    }
+
+    fun publishLiveNotice(
+        title: String,
+        message: String,
+        active: Boolean,
+        onResult: (Result<Unit>) -> Unit
+    ) {
+        val adminEmail = adminSessionState.value.currentAdmin?.email ?: normalizedUserEmail
+        if (adminEmail.isBlank()) {
+            onResult(Result.failure(IllegalStateException("Admin session required.")))
+            return
+        }
+        viewModelScope.launch {
+            val result = repository.publishLiveNotice(title, message, active, adminEmail)
             onResult(result)
         }
     }

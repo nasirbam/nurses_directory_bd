@@ -99,6 +99,37 @@ service cloud.firestore {
              data.updatedAt is timestamp && data.updatedAt <= request.time;
     }
 
+    function isValidTransferRequest(data) {
+      return data.nurseId is string && isValidId(data.nurseId) &&
+             data.nurseName is string && data.nurseName.size() >= 3 && data.nurseName.size() <= 80 &&
+             data.bnmcNumber is string && data.bnmcNumber.size() >= 4 && data.bnmcNumber.size() <= 30 &&
+             data.requestedByUid is string && data.requestedByUid.size() >= 1 && data.requestedByUid.size() <= 128 &&
+             data.currentHospitalName is string && data.currentHospitalName.size() >= 3 && data.currentHospitalName.size() <= 120 &&
+             data.currentDivision is string && data.currentDivision.size() >= 2 && data.currentDivision.size() <= 40 &&
+             data.currentDistrict is string && data.currentDistrict.size() >= 2 && data.currentDistrict.size() <= 40 &&
+             (!('currentUpazila' in data) || (data.currentUpazila is string && data.currentUpazila.size() <= 50)) &&
+             data.newHospitalName is string && data.newHospitalName.size() >= 3 && data.newHospitalName.size() <= 120 &&
+             data.newDivision is string && data.newDivision.size() >= 2 && data.newDivision.size() <= 40 &&
+             data.newDistrict is string && data.newDistrict.size() >= 2 && data.newDistrict.size() <= 40 &&
+             (!('newUpazila' in data) || (data.newUpazila is string && data.newUpazila.size() <= 50)) &&
+             data.transferNote is string && data.transferNote.size() <= 250 &&
+             data.status in ['PENDING', 'APPROVED', 'REJECTED'] &&
+             data.rejectionReason is string && data.rejectionReason.size() <= 250 &&
+             (!('reviewedBy' in data) || data.reviewedBy == null || (data.reviewedBy is string && data.reviewedBy.size() <= 128)) &&
+             (!('reviewedAt' in data) || data.reviewedAt == null || (data.reviewedAt is timestamp && data.reviewedAt <= request.time)) &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
+    function isValidLiveNotice(data) {
+      return data.title is string && data.title.size() <= 100 &&
+             data.message is string && data.message.size() <= 400 &&
+             data.active is bool &&
+             data.updatedBy is string && data.updatedBy.size() >= 2 && data.updatedBy.size() <= 128 &&
+             data.createdAt is timestamp && data.createdAt <= request.time &&
+             data.updatedAt is timestamp && data.updatedAt <= request.time;
+    }
+
     // 4. Admins Collection Rules
     match /admins/{adminEmail} {
       allow get: if hasVerifiedEmail() && isValidEmailId(adminEmail) && (
@@ -185,15 +216,17 @@ service cloud.firestore {
                          (
                            isAdmin() &&
                            incoming().diff(existing()).affectedKeys().hasOnly([
-                             'approvalStatus', 'rejectionReason', 'reviewedBy', 'reviewedAt',
-                             'availabilityStatus', 'updatedAt'
+                             'fullName', 'bnmcNumber', 'designation', 'qualification', 'specialty',
+                             'division', 'district', 'upazila', 'hospitalName', 'phone', 'whatsapp',
+                             'email', 'bloodGroup', 'availabilityStatus', 'experienceYears', 'bio',
+                             'approvalStatus', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'updatedAt'
                            ])
                          ) ||
                          (
                            existing().submittedByUid == request.auth.uid &&
                            existing().approvalStatus != 'REJECTED' &&
                            incoming().diff(existing()).affectedKeys().hasOnly([
-                             'availabilityStatus', 'phone', 'whatsapp', 'upazila', 'hospitalName', 'bio', 'updatedAt'
+                             'availabilityStatus', 'phone', 'whatsapp', 'bio', 'updatedAt'
                            ])
                          )
                        );
@@ -202,6 +235,83 @@ service cloud.firestore {
         isAdmin() ||
         (existing().submittedByUid == request.auth.uid && existing().approvalStatus == 'PENDING')
       );
+    }
+
+    // 6. Transfer Requests Collection Rules
+    match /transfer_requests/{requestId} {
+      allow get: if isSignedIn() && isValidId(requestId) && (
+        existing().requestedByUid == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow list: if isSignedIn() && (
+        existing().requestedByUid == request.auth.uid ||
+        isAdmin()
+      );
+
+      allow create: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       incoming().keys().hasAll([
+                         'nurseId', 'nurseName', 'bnmcNumber', 'requestedByUid',
+                         'currentHospitalName', 'currentDivision', 'currentDistrict',
+                         'newHospitalName', 'newDivision', 'newDistrict',
+                         'transferNote', 'status', 'rejectionReason', 'createdAt', 'updatedAt'
+                       ]) &&
+                       incoming().keys().hasOnly([
+                         'nurseId', 'nurseName', 'bnmcNumber', 'requestedByUid',
+                         'currentHospitalName', 'currentDivision', 'currentDistrict', 'currentUpazila',
+                         'newHospitalName', 'newDivision', 'newDistrict', 'newUpazila',
+                         'transferNote', 'status', 'rejectionReason', 'reviewedBy', 'reviewedAt',
+                         'createdAt', 'updatedAt'
+                       ]) &&
+                       isValidTransferRequest(incoming()) &&
+                       incoming().requestedByUid == request.auth.uid &&
+                       incoming().status == 'PENDING' &&
+                       incoming().rejectionReason == '' &&
+                       (!('reviewedBy' in incoming()) || incoming().reviewedBy == null) &&
+                       (!('reviewedAt' in incoming()) || incoming().reviewedAt == null) &&
+                       exists(/databases/$(database)/documents/nurses/$(incoming().nurseId)) &&
+                       get(/databases/$(database)/documents/nurses/$(incoming().nurseId)).data.submittedByUid == request.auth.uid &&
+                       get(/databases/$(database)/documents/nurses/$(incoming().nurseId)).data.approvalStatus == 'APPROVED';
+
+      allow update: if isSignedIn() &&
+                       isValidId(requestId) &&
+                       isAdmin() &&
+                       isValidTransferRequest(incoming()) &&
+                       incoming().nurseId == existing().nurseId &&
+                       incoming().requestedByUid == existing().requestedByUid &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'status', 'rejectionReason', 'reviewedBy', 'reviewedAt', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && isValidId(requestId) && (
+        isAdmin() ||
+        (existing().requestedByUid == request.auth.uid && existing().status == 'PENDING')
+      );
+    }
+
+    // 7. Live Remote Config & Broadcast Notice
+    match /app_config/{configId} {
+      allow get, list: if isSignedIn();
+
+      allow create: if isSignedIn() &&
+                       configId == 'live_notice' &&
+                       isAdmin() &&
+                       incoming().keys().hasAll(['title', 'message', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
+                       incoming().keys().hasOnly(['title', 'message', 'active', 'updatedBy', 'createdAt', 'updatedAt']) &&
+                       isValidLiveNotice(incoming());
+
+      allow update: if isSignedIn() &&
+                       configId == 'live_notice' &&
+                       isAdmin() &&
+                       isValidLiveNotice(incoming()) &&
+                       incoming().createdAt == existing().createdAt &&
+                       incoming().diff(existing()).affectedKeys().hasOnly([
+                         'title', 'message', 'active', 'updatedBy', 'updatedAt'
+                       ]);
+
+      allow delete: if isSignedIn() && configId == 'live_notice' && isAdmin();
     }
   }
 }

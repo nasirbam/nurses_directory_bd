@@ -25,6 +25,7 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Bloodtype
+import androidx.compose.material.icons.filled.Campaign
 import androidx.compose.material.icons.filled.Clear
 import androidx.compose.material.icons.filled.FilterList
 import androidx.compose.material.icons.filled.LocalHospital
@@ -69,6 +70,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.example.R
 import com.example.data.BangladeshData
+import com.example.data.LiveNoticeEntity
 import com.example.data.NurseEntity
 import com.example.ui.ContactActions
 import com.example.ui.DirectoryUiState
@@ -76,6 +78,7 @@ import com.example.ui.DirectoryUiState
 @Composable
 fun DirectoryScreen(
     uiState: DirectoryUiState,
+    liveNotice: LiveNoticeEntity? = null,
     onSearchQueryChange: (String) -> Unit,
     onSelectDivision: (String) -> Unit,
     onSelectDistrict: (String) -> Unit,
@@ -168,7 +171,7 @@ fun DirectoryScreen(
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        text = "${uiState.totalVerifiedCount} Verified Nurses • 8 Divisions",
+                                        text = "Live Sync • ${uiState.totalVerifiedCount} Verified Nurses",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = Color.White,
                                         fontWeight = FontWeight.SemiBold
@@ -188,6 +191,52 @@ fun DirectoryScreen(
                                     style = MaterialTheme.typography.bodyMedium,
                                     color = Color(0xFFE0F7F1)
                                 )
+                            }
+                        }
+                    }
+                }
+            }
+
+            if (liveNotice != null && liveNotice.active && (liveNotice.title.isNotBlank() || liveNotice.message.isNotBlank())) {
+                item(span = { GridItemSpan(columns) }) {
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .testTag("directory_live_notice_card"),
+                        shape = MaterialTheme.shapes.large,
+                        colors = CardDefaults.cardColors(
+                            containerColor = MaterialTheme.colorScheme.secondaryContainer
+                        )
+                    ) {
+                        Row(
+                            modifier = Modifier.padding(14.dp),
+                            verticalAlignment = Alignment.Top
+                        ) {
+                            Icon(
+                                imageVector = Icons.Filled.Campaign,
+                                contentDescription = "Live Notice",
+                                tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(20.dp)
+                            )
+                            Spacer(Modifier.width(10.dp))
+                            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                                if (liveNotice.title.isNotBlank()) {
+                                    Text(
+                                        text = liveNotice.title,
+                                        style = MaterialTheme.typography.titleSmall,
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
+                                if (liveNotice.message.isNotBlank()) {
+                                    Text(
+                                        text = liveNotice.message,
+                                        style = MaterialTheme.typography.bodySmall,
+                                        color = MaterialTheme.colorScheme.onSecondaryContainer
+                                    )
+                                }
                             }
                         }
                     }
