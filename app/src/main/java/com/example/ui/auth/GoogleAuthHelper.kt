@@ -1,6 +1,5 @@
 package com.example.ui.auth
 
-import android.annotation.SuppressLint
 import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
@@ -41,6 +40,7 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.NoCredentialException
+import com.example.R
 import com.google.android.libraries.identity.googleid.GetGoogleIdOption
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
@@ -107,15 +107,8 @@ private fun isFirebaseAvailable(context: Context): Boolean {
     }.getOrDefault(false)
 }
 
-@SuppressLint("DiscouragedApi")
 private fun resolveDefaultWebClientId(context: Context): String? {
-    val resId = context.resources.getIdentifier(
-        "default_web_client_id",
-        "string",
-        context.packageName
-    )
-    if (resId == 0) return null
-    return runCatching { context.getString(resId) }
+    return runCatching { context.getString(R.string.default_web_client_id) }
         .getOrNull()
         ?.takeIf { it.isNotBlank() }
 }
@@ -211,15 +204,21 @@ fun onGoogleSignInClicked(
                 "Google Sign-In cancelled/rejected. sha1=$installedSha1 msg=${e.errorMessage ?: e.message}",
                 e
             )
+            val detail = e.errorMessage?.toString()?.trim().orEmpty()
             onAuthCancelled(
-                "গুগল সাইন-ইন সম্পন্ন হয়নি। ফোনে ইন্টারনেট সংযোগ ও স্বয়ংক্রিয় সময় (Auto date & time) চালু আছে কি না দেখে আবার চেষ্টা করুন।"
+                "গুগল সাইন-ইন সম্পন্ন হয়নি। ফোনে ইন্টারনেট সংযোগ, Google অ্যাকাউন্ট ও স্বয়ংক্রিয় সময় (Auto date & time) পরীক্ষা করে আবার চেষ্টা করুন।" +
+                    if (detail.isNotBlank()) "\n($detail)" else ""
             )
         } catch (e: NoCredentialException) {
             Log.w("Auth", "No Google credentials available: ${e.message}", e)
             onAuthError("এই ফোনে কোনো গুগল অ্যাকাউন্ট পাওয়া যায়নি। Settings থেকে একটি Google অ্যাকাউন্ট যুক্ত করে আবার চেষ্টা করুন।")
         } catch (e: GetCredentialException) {
             Log.e("Auth", "Credential Manager error (${e.type}) sha1=$installedSha1: ${e.errorMessage}", e)
-            onAuthError("সাইন-ইন করতে সমস্যা হয়েছে। Google Play Services ও ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।")
+            val detail = e.errorMessage?.toString()?.trim().orEmpty()
+            onAuthError(
+                "সাইন-ইন করতে সমস্যা হয়েছে। Google Play Services ও ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।" +
+                    if (detail.isNotBlank()) "\n($detail)" else ""
+            )
         } catch (e: Exception) {
             Log.e("Auth", "Google Sign-In failed", e)
             onAuthError("সাইন-ইন সম্পন্ন হয়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।")
