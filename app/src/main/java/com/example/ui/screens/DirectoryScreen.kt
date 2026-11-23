@@ -182,7 +182,7 @@ fun DirectoryScreen(
                                     )
                                     Spacer(Modifier.width(6.dp))
                                     Text(
-                                        text = "Live Sync • ${uiState.totalVerifiedCount} Verified Nurses",
+                                        text = "${uiState.totalVerifiedCount} জন যাচাইকৃত নার্স • ৮ বিভাগ",
                                         style = MaterialTheme.typography.labelMedium,
                                         color = Color.White,
                                         fontWeight = FontWeight.SemiBold
@@ -232,7 +232,7 @@ fun DirectoryScreen(
                                 )
                                 Spacer(Modifier.width(8.dp))
                                 Text(
-                                    text = "নতুন ভার্সন পাওয়া গেছে • v${appRelease.latestVersionName}",
+                                    text = "নতুন সংস্করণ (v${appRelease.latestVersionName}) উপলব্ধ",
                                     style = MaterialTheme.typography.titleSmall,
                                     fontWeight = FontWeight.Bold,
                                     color = MaterialTheme.colorScheme.onTertiaryContainer
@@ -255,7 +255,7 @@ fun DirectoryScreen(
                                     ) {
                                         Icon(Icons.Filled.SystemUpdate, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("Update APK")
+                                        Text("আপডেট করুন")
                                     }
                                 }
                                 if (appRelease.webPortalUrl.isNotBlank()) {
@@ -267,7 +267,7 @@ fun DirectoryScreen(
                                     ) {
                                         Icon(Icons.Filled.OpenInBrowser, contentDescription = null, modifier = Modifier.size(16.dp))
                                         Spacer(Modifier.width(6.dp))
-                                        Text("Web Portal")
+                                        Text("ওয়েব পোর্টাল")
                                     }
                                 }
                             }
@@ -437,7 +437,7 @@ fun DirectoryScreen(
                                     },
                                     label = {
                                         Text(
-                                            if (uiState.filters.selectedDistrict == "All") "Jela (District)"
+                                            if (uiState.filters.selectedDistrict == "All") "District"
                                             else uiState.filters.selectedDistrict
                                         )
                                     },
@@ -452,7 +452,7 @@ fun DirectoryScreen(
                                     onDismissRequest = { showDistrictMenu = false }
                                 ) {
                                     DropdownMenuItem(
-                                        text = { Text("All Districts (Jela)") },
+                                        text = { Text("All Districts") },
                                         onClick = {
                                             onSelectDistrict("All")
                                             showDistrictMenu = false

@@ -35,7 +35,6 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.data.NursesRepository
 import com.example.ui.auth.GoogleSignInButton
 
 @Composable
@@ -100,9 +99,9 @@ fun AdminAuthGate(
                         )
                         Text(
                             text = when {
-                                isCheckingRole -> "Cloud Firestore থেকে অ্যাডমিন অনুমতি যাচাই করা হচ্ছে"
+                                isCheckingRole -> "অ্যাডমিন অনুমোদন যাচাই করা হচ্ছে..."
                                 isSignedIn -> "এই ইমেইলটি অ্যাডমিন তালিকায় যুক্ত নেই"
-                                else -> "ড্যাশবোর্ড, অনুমোদন ও অ্যাডমিন নিয়ন্ত্রণের জন্য Google Sign-In করুন"
+                                else -> "ড্যাশবোর্ড, অনুমোদন ও নিয়ন্ত্রণের জন্য গুগল সাইন-ইন করুন"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -139,7 +138,7 @@ fun AdminAuthGate(
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
                             Text(
-                                text = "শুধুমাত্র অনুমোদিত অ্যাডমিন অ্যাকাউন্ট (যেমন: ${NursesRepository.BOOTSTRAP_ADMIN_EMAIL} অথবা Super Admin কর্তৃক যুক্ত অ্যাডমিন) অ্যাডমিন প্যানেল ও অ্যানালিটিক্স ড্যাশবোর্ড দেখতে পারবেন।",
+                                text = "শুধুমাত্র অনুমোদিত অ্যাডমিন অ্যাকাউন্ট থেকে অ্যাডমিন প্যানেল ও প্রতিবেদন দেখা যাবে। প্রয়োজনে সুপার অ্যাডমিনের সাথে যোগাযোগ করুন।",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -188,7 +187,7 @@ fun AdminAuthGate(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "Primary Admin: ${NursesRepository.BOOTSTRAP_ADMIN_EMAIL} (অথবা অনুমোদিত যেকোনো Admin Google অ্যাকাউন্ট দিয়ে সাইন ইন করুন)",
+                                text = "শুধুমাত্র নির্ধারিত অ্যাডমিন গুগল অ্যাকাউন্ট দিয়ে ড্যাশবোর্ডে প্রবেশ করা যাবে।",
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )

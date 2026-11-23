@@ -1,5 +1,6 @@
 package com.example.ui.components
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -12,7 +13,6 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Chat
 import androidx.compose.material.icons.filled.Call
@@ -25,7 +25,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButtonDefaults
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedIconButton
-import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.material3.minimumInteractiveComponentSize
 import androidx.compose.runtime.Composable
@@ -55,6 +54,13 @@ fun NurseCard(
         .joinToString("") { it.first().uppercase() }
         .ifBlank { nurse.fullName.take(2).uppercase() }
 
+    val subtitlePlace = nurse.hospitalName.ifBlank {
+        listOf(nurse.upazila, nurse.district).filter { it.isNotBlank() }.joinToString(", ")
+    }
+    val roleLine = listOf(nurse.designation, subtitlePlace)
+        .filter { it.isNotBlank() }
+        .joinToString(" • ")
+
     Card(
         modifier = modifier
             .fillMaxWidth()
@@ -62,10 +68,11 @@ fun NurseCard(
             .clip(MaterialTheme.shapes.large)
             .clickable(onClick = onCardClick),
         shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.5.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -104,64 +111,44 @@ fun NurseCard(
                         overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.weight(1f, fill = false)
                     )
-                    Spacer(modifier = Modifier.width(4.dp))
                     if (nurse.approvalEnum == ApprovalStatus.APPROVED) {
+                        Spacer(modifier = Modifier.width(5.dp))
                         Icon(
                             imageVector = Icons.Filled.Verified,
-                            contentDescription = "Verified Nurse",
+                            contentDescription = "Verified",
                             tint = StatusApproved,
                             modifier = Modifier.size(16.dp)
                         )
                     }
                 }
 
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
-                ) {
+                if (roleLine.isNotBlank()) {
                     Text(
-                        text = "${nurse.registrationNumberLabel}: ${nurse.bnmcNumber}",
-                        style = MaterialTheme.typography.labelSmall,
+                        text = roleLine,
+                        style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         maxLines = 1,
-                        overflow = TextOverflow.Ellipsis,
-                        modifier = Modifier.weight(1f, fill = false)
+                        overflow = TextOverflow.Ellipsis
                     )
-                    if (nurse.approvalEnum == ApprovalStatus.APPROVED) {
-                        Surface(
-                            shape = RoundedCornerShape(6.dp),
-                            color = StatusApproved.copy(alpha = 0.14f)
-                        ) {
-                            Row(
-                                modifier = Modifier.padding(horizontal = 5.dp, vertical = 2.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Icon(
-                                    imageVector = Icons.Filled.Verified,
-                                    contentDescription = "Verified",
-                                    tint = StatusApproved,
-                                    modifier = Modifier.size(11.dp)
-                                )
-                                Spacer(Modifier.width(3.dp))
-                                Text(
-                                    text = "Verified",
-                                    style = MaterialTheme.typography.labelSmall,
-                                    fontWeight = FontWeight.Bold,
-                                    color = StatusApproved
-                                )
-                            }
-                        }
-                    }
                 }
+
+                Text(
+                    text = "${nurse.registrationNumberLabel}: ${nurse.bnmcNumber}" +
+                        if (nurse.district.isNotBlank()) " • ${nurse.district}" else "",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
 
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Icon(
                         imageVector = Icons.Filled.Phone,
                         contentDescription = null,
                         tint = MaterialTheme.colorScheme.primary,
-                        modifier = Modifier.size(15.dp)
+                        modifier = Modifier.size(14.dp)
                     )
-                    Spacer(modifier = Modifier.width(6.dp))
+                    Spacer(modifier = Modifier.width(5.dp))
                     Text(
                         text = nurse.phone,
                         style = MaterialTheme.typography.bodyMedium,

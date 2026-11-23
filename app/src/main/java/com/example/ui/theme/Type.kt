@@ -67,22 +67,22 @@ val AppTypography = Typography(
         fontFamily = BodyFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 15.sp,
-        lineHeight = 22.sp,
-        letterSpacing = 0.15.sp
+        lineHeight = 23.sp,
+        letterSpacing = 0.sp
     ),
     bodyMedium = TextStyle(
         fontFamily = BodyFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 14.sp,
-        lineHeight = 20.sp,
-        letterSpacing = 0.15.sp
+        lineHeight = 21.sp,
+        letterSpacing = 0.sp
     ),
     bodySmall = TextStyle(
         fontFamily = BodyFontFamily,
         fontWeight = FontWeight.Normal,
         fontSize = 12.sp,
-        lineHeight = 16.sp,
-        letterSpacing = 0.2.sp
+        lineHeight = 18.sp,
+        letterSpacing = 0.sp
     ),
     labelLarge = TextStyle(
         fontFamily = DisplayFontFamily,

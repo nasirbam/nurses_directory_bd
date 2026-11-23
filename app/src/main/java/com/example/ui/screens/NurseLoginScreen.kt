@@ -111,7 +111,7 @@ fun NurseLoginScreen(
                         )
                         Spacer(Modifier.width(10.dp))
                         Text(
-                            text = "নিরাপত্তার স্বার্থে Google Sign-In দিয়ে লগইন করলে লাইভ Cloud Firestore থেকে ভেরিফায়েড নার্সদের তালিকা ও যোগাযোগ নম্বর দেখা যাবে।",
+                            text = "সদস্যদের তথ্যের গোপনীয়তা রক্ষায় গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করলে যাচাইকৃত নার্সদের তালিকা ও সরাসরি যোগাযোগের মাধ্যম দেখতে পারবেন।",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSurface
                         )

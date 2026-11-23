@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.BoxWithConstraints
@@ -114,7 +115,7 @@ fun NurseListScreen(
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
                             Text(
-                                text = "সকল নিবন্ধিত নার্স (${uiState.totalCount} in Live Cloud Firestore)",
+                                text = "মোট ${uiState.totalCount} জন নিবন্ধিত নার্স ও মিডওয়াইফ",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSecondaryContainer
                             )
@@ -297,6 +298,16 @@ private fun RegisteredNurseListItem(
         ApprovalStatus.REJECTED -> StatusRejected
     }
 
+    val statusLabel = when (nurse.approvalEnum) {
+        ApprovalStatus.APPROVED -> "Approved"
+        ApprovalStatus.PENDING -> "Pending"
+        ApprovalStatus.REJECTED -> "Rejected"
+    }
+    val roleSummary = listOf(
+        nurse.designation,
+        nurse.hospitalName.ifBlank { nurse.district }
+    ).filter { it.isNotBlank() }.joinToString(" • ")
+
     Card(
         modifier = Modifier
             .fillMaxWidth()
@@ -304,10 +315,11 @@ private fun RegisteredNurseListItem(
             .clip(MaterialTheme.shapes.large)
             .clickable(onClick = onCardClick),
         shape = MaterialTheme.shapes.large,
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)),
         colors = CardDefaults.cardColors(
             containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
         ),
-        elevation = CardDefaults.cardElevation(defaultElevation = 1.dp)
+        elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
     ) {
         Row(
             modifier = Modifier
@@ -317,7 +329,7 @@ private fun RegisteredNurseListItem(
         ) {
             Column(
                 modifier = Modifier.weight(1f),
-                verticalArrangement = Arrangement.spacedBy(4.dp)
+                verticalArrangement = Arrangement.spacedBy(3.dp)
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -336,13 +348,23 @@ private fun RegisteredNurseListItem(
                         color = statusColor.copy(alpha = 0.14f)
                     ) {
                         Text(
-                            text = nurse.approvalEnum.name,
+                            text = statusLabel,
                             style = MaterialTheme.typography.labelSmall,
                             fontWeight = FontWeight.Bold,
                             color = statusColor,
-                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 3.dp)
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp)
                         )
                     }
+                }
+
+                if (roleSummary.isNotBlank()) {
+                    Text(
+                        text = roleSummary,
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        maxLines = 1,
+                        overflow = TextOverflow.Ellipsis
+                    )
                 }
 
                 Row(verticalAlignment = Alignment.CenterVertically) {

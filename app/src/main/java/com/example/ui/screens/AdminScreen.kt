@@ -605,7 +605,7 @@ fun AdminDashboardScreen(
                     KpiCard(
                         title = "Total Registered",
                         value = analytics.totalRegistered.toString(),
-                        subtitle = "Live Cloud Firestore",
+                        subtitle = "All Directory Entries",
                         icon = Icons.Filled.Groups,
                         accentColor = MaterialTheme.colorScheme.primary,
                         modifier = Modifier
@@ -672,7 +672,7 @@ fun AdminDashboardScreen(
                 ) {
                     Column(modifier = Modifier.weight(1f)) {
                         Text(
-                            text = "Live Broadcast Update",
+                            text = "Notice Board",
                             style = MaterialTheme.typography.titleSmall,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer
@@ -681,7 +681,7 @@ fun AdminDashboardScreen(
                             text = if (liveNotice?.active == true) {
                                 "Active: ${liveNotice.title.ifBlank { liveNotice.message }}"
                             } else {
-                                "অ্যাপ ডাউনলোড ছাড়াই সবার ফোনে তাৎক্ষণিক তথ্য আপডেট পাঠান"
+                                "সকল সদস্যের ডিরেক্টরি স্ক্রিনে জরুরি ঘোষণা প্রকাশ করুন"
                             },
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer,
@@ -696,7 +696,7 @@ fun AdminDashboardScreen(
                     ) {
                         Icon(Icons.Filled.Campaign, contentDescription = null, modifier = Modifier.size(18.dp))
                         Spacer(Modifier.width(6.dp))
-                        Text("Broadcast")
+                        Text("Publish")
                     }
                 }
             }
@@ -718,12 +718,12 @@ fun AdminDashboardScreen(
                     verticalArrangement = Arrangement.spacedBy(10.dp)
                 ) {
                     Text(
-                        text = "Auto-Update & Live Sync Controls",
+                        text = "Directory & Version Management",
                         style = MaterialTheme.typography.titleSmall,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
-                        text = "ডাউনলোড ছাড়াই নতুন কোর্স/পদবি/স্পেশালিটি আপডেট করুন ($extraCount custom) অথবা নতুন APK / ওয়েব লিংক পাবলিশ করুন।",
+                        text = "ডিরেক্টরির পদবি, কোর্স ও স্পেশালিটি তালিকা ($extraCount টি কাস্টম) এবং নতুন সংস্করণ তথ্য নিয়ন্ত্রণ করুন।",
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
@@ -739,7 +739,7 @@ fun AdminDashboardScreen(
                         ) {
                             Icon(Icons.Filled.CloudSync, contentDescription = null, modifier = Modifier.size(16.dp))
                             Spacer(Modifier.width(6.dp))
-                            Text("Live Options")
+                            Text("Form Options")
                         }
                         OutlinedButton(
                             onClick = onOpenAppRelease,
@@ -751,7 +751,7 @@ fun AdminDashboardScreen(
                             Spacer(Modifier.width(6.dp))
                             Text(
                                 if (appRelease?.active == true) "v${appRelease.latestVersionName} Alert"
-                                else "App Release"
+                                else "Version Release"
                             )
                         }
                     }

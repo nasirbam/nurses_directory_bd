@@ -1,5 +1,6 @@
 package com.example.ui.screens
 
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -25,18 +26,15 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
 import androidx.compose.material.icons.filled.AdminPanelSettings
-import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.HealthAndSafety
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.MedicalServices
 import androidx.compose.material.icons.filled.PersonAddAlt1
-import androidx.compose.material.icons.filled.VerifiedUser
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.FilledTonalButton
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -53,14 +51,12 @@ import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.testTag
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import com.example.BuildConfig
 import com.example.R
 
 @Composable
@@ -78,8 +74,8 @@ fun HomeScreen(
                 Brush.verticalGradient(
                     colors = listOf(
                         Color(0xFF004D42),
-                        Color(0xFF006B5B),
-                        Color(0xFFEAF6F3),
+                        Color(0xFF006354),
+                        MaterialTheme.colorScheme.background,
                         MaterialTheme.colorScheme.background
                     )
                 )
@@ -192,7 +188,7 @@ fun HomeScreen(
                             color = Color.White
                         )
                         Text(
-                            text = "Bangladesh Nursing Portal • v${BuildConfig.VERSION_NAME}",
+                            text = "বাংলাদেশ নার্সিং নেটওয়ার্ক",
                             style = MaterialTheme.typography.labelSmall,
                             color = Color(0xFFD2F5EC)
                         )
@@ -250,7 +246,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.width(10.dp))
                             Text(
-                                text = "এই APK-তে Firebase কনফিগ (google-services.json) যুক্ত নেই। লাইভ লগইন ও ডাটাবেজ চালু করতে AI Studio থেকে APK ডাউনলোড করুন অথবা GitHub Secrets-এ GOOGLE_SERVICES_JSON যোগ করুন।",
+                                text = "অ্যাপের সার্ভার সংযোগ প্রস্তুত নয়। অনুগ্রহ করে অফিসিয়াল সংস্করণ ইনস্টল করুন অথবা অ্যাডমিনের সাথে যোগাযোগ করুন।",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onErrorContainer
                             )
@@ -262,7 +258,8 @@ fun HomeScreen(
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
-                    elevation = CardDefaults.cardElevation(defaultElevation = 6.dp),
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
+                    elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                     )
@@ -271,7 +268,7 @@ fun HomeScreen(
                         Box(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(190.dp)
+                                .height(186.dp)
                         ) {
                             Image(
                                 painter = painterResource(id = R.drawable.img_hero_banner),
@@ -286,7 +283,7 @@ fun HomeScreen(
                                         Brush.verticalGradient(
                                             colors = listOf(
                                                 Color(0x33003B32),
-                                                Color(0xDD003B32)
+                                                Color(0xDE00332B)
                                             )
                                         )
                                     )
@@ -295,120 +292,85 @@ fun HomeScreen(
                                 modifier = Modifier
                                     .fillMaxSize()
                                     .padding(18.dp),
-                                verticalArrangement = Arrangement.SpaceBetween
+                                verticalArrangement = Arrangement.Bottom
                             ) {
-                                Surface(
-                                    shape = RoundedCornerShape(50),
-                                    color = Color(0x36FFFFFF)
-                                ) {
-                                    Row(
-                                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
-                                        verticalAlignment = Alignment.CenterVertically
-                                    ) {
-                                        Icon(
-                                            imageVector = Icons.Filled.Favorite,
-                                            contentDescription = null,
-                                            tint = Color(0xFFFFB4B4),
-                                            modifier = Modifier.size(14.dp)
-                                        )
-                                        Spacer(Modifier.width(6.dp))
-                                        Text(
-                                            text = "সেবা, যত্ন ও পেশাগত ঐক্য • ৮ বিভাগ",
-                                            style = MaterialTheme.typography.labelMedium,
-                                            color = Color.White,
-                                            fontWeight = FontWeight.SemiBold
-                                        )
-                                    }
-                                }
-
-                                Column {
-                                    Text(
-                                        text = "Bangladesh Nurses E-Directory",
-                                        style = MaterialTheme.typography.headlineSmall,
-                                        fontWeight = FontWeight.Bold,
-                                        color = Color.White
-                                    )
-                                    Spacer(Modifier.height(4.dp))
-                                    Text(
-                                        text = "সারা বাংলাদেশের নিবন্ধিত নার্সদের ভেরিফায়েড নেটওয়ার্ক ও দ্রুত যোগাযোগ মাধ্যম",
-                                        style = MaterialTheme.typography.bodyMedium,
-                                        color = Color(0xFFE0F7F1)
-                                    )
-                                }
+                                Text(
+                                    text = "Bangladesh Nurses E-Directory",
+                                    style = MaterialTheme.typography.headlineSmall,
+                                    fontWeight = FontWeight.Bold,
+                                    color = Color.White
+                                )
+                                Spacer(Modifier.height(4.dp))
+                                Text(
+                                    text = "নিবন্ধিত নার্স ও মিডওয়াইফদের ভেরিফায়েড ডিরেক্টরি ও যোগাযোগ মাধ্যম",
+                                    style = MaterialTheme.typography.bodyMedium,
+                                    color = Color(0xFFE0F7F1)
+                                )
                             }
                         }
 
-                        // Protected Privacy & Nursing Highlights inside Hero Card
                         Column(
                             modifier = Modifier.padding(18.dp),
                             verticalArrangement = Arrangement.spacedBy(12.dp)
                         ) {
-                            Surface(
-                                shape = MaterialTheme.shapes.medium,
-                                color = MaterialTheme.colorScheme.primaryContainer.copy(alpha = 0.55f),
-                                modifier = Modifier.fillMaxWidth()
-                            ) {
-                                Row(
-                                    modifier = Modifier.padding(12.dp),
-                                    verticalAlignment = Alignment.CenterVertically
-                                ) {
-                                    Icon(
-                                        imageVector = Icons.Filled.Lock,
-                                        contentDescription = null,
-                                        tint = MaterialTheme.colorScheme.primary,
-                                        modifier = Modifier.size(20.dp)
-                                    )
-                                    Spacer(Modifier.width(10.dp))
-                                    Text(
-                                        text = "নিরাপত্তার স্বার্থে লগইন ছাড়া অন্য নার্সদের তথ্য ও সার্চ দেখা যাবে না। লগইন করে ডিরেক্টরি সার্চ করুন।",
-                                        style = MaterialTheme.typography.bodySmall,
-                                        color = MaterialTheme.colorScheme.onSurface
-                                    )
-                                }
-                            }
-
                             Row(
                                 modifier = Modifier.fillMaxWidth(),
-                                horizontalArrangement = Arrangement.spacedBy(10.dp)
+                                horizontalArrangement = Arrangement.SpaceBetween,
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                NursingHighlightTile(
-                                    icon = Icons.Filled.VerifiedUser,
-                                    title = "BNMC Verified",
-                                    subtitle = "অ্যাডমিন অনুমোদিত",
-                                    modifier = Modifier.weight(1f)
+                                Text(
+                                    text = "৮ বিভাগ • ৬৪ জেলা",
+                                    style = MaterialTheme.typography.labelLarge,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.primary
                                 )
-                                NursingHighlightTile(
-                                    icon = Icons.Filled.MedicalServices,
-                                    title = "64 Districts",
-                                    subtitle = "সারা বাংলাদেশ",
-                                    modifier = Modifier.weight(1f)
+                                Text(
+                                    text = "BNMC ও শিক্ষার্থী নিবন্ধন",
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
-                                NursingHighlightTile(
-                                    icon = Icons.Filled.HealthAndSafety,
-                                    title = "Quick Connect",
-                                    subtitle = "কল ও হোয়াটসঅ্যাপ",
-                                    modifier = Modifier.weight(1f)
+                            }
+
+                            HorizontalDivider(
+                                color = MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.5f)
+                            )
+
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Icon(
+                                    imageVector = Icons.Filled.Lock,
+                                    contentDescription = null,
+                                    tint = MaterialTheme.colorScheme.primary,
+                                    modifier = Modifier.size(18.dp)
+                                )
+                                Spacer(Modifier.width(10.dp))
+                                Text(
+                                    text = "সদস্যদের তথ্যের সুরক্ষায় সাইন-ইন করে ডিরেক্টরি ও যোগাযোগ নম্বর দেখুন।",
+                                    style = MaterialTheme.typography.bodySmall,
+                                    color = MaterialTheme.colorScheme.onSurfaceVariant
                                 )
                             }
                         }
                     }
                 }
 
-                // Primary Action Buttons: Login & Register
+                // Primary Action Buttons
                 Card(
                     modifier = Modifier.fillMaxWidth(),
                     shape = MaterialTheme.shapes.extraLarge,
+                    border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant.copy(alpha = 0.4f)),
                     colors = CardDefaults.cardColors(
                         containerColor = MaterialTheme.colorScheme.surfaceContainerLowest
                     ),
-                    elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                    elevation = CardDefaults.cardElevation(defaultElevation = 0.dp)
                 ) {
                     Column(
                         modifier = Modifier.padding(20.dp),
                         verticalArrangement = Arrangement.spacedBy(12.dp)
                     ) {
                         Text(
-                            text = "শুরু করুন (Get Started)",
+                            text = "সদস্য প্রবেশ",
                             style = MaterialTheme.typography.titleMedium,
                             fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSurface
@@ -418,9 +380,9 @@ fun HomeScreen(
                             onClick = onLoginClick,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(54.dp)
+                                .height(52.dp)
                                 .testTag("home_login_button"),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.AutoMirrored.Filled.Login,
@@ -429,7 +391,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "Nurse Login (লগইন করুন)",
+                                text = "সাইন-ইন করুন",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -439,9 +401,9 @@ fun HomeScreen(
                             onClick = onRegisterClick,
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .height(54.dp)
+                                .height(52.dp)
                                 .testTag("home_register_button"),
-                            shape = RoundedCornerShape(16.dp)
+                            shape = RoundedCornerShape(14.dp)
                         ) {
                             Icon(
                                 imageVector = Icons.Filled.PersonAddAlt1,
@@ -450,7 +412,7 @@ fun HomeScreen(
                             )
                             Spacer(Modifier.width(8.dp))
                             Text(
-                                text = "Register New Nurse (নিবন্ধন করুন)",
+                                text = "নতুন নিবন্ধন করুন",
                                 style = MaterialTheme.typography.titleSmall,
                                 fontWeight = FontWeight.Bold
                             )
@@ -460,44 +422,6 @@ fun HomeScreen(
 
                 Spacer(Modifier.height(12.dp))
             }
-        }
-    }
-}
-
-@Composable
-private fun NursingHighlightTile(
-    icon: ImageVector,
-    title: String,
-    subtitle: String,
-    modifier: Modifier = Modifier
-) {
-    Surface(
-        modifier = modifier,
-        shape = MaterialTheme.shapes.medium,
-        color = MaterialTheme.colorScheme.surfaceContainerLow
-    ) {
-        Column(
-            modifier = Modifier.padding(horizontal = 8.dp, vertical = 12.dp),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Icon(
-                imageVector = icon,
-                contentDescription = null,
-                tint = MaterialTheme.colorScheme.primary,
-                modifier = Modifier.size(22.dp)
-            )
-            Spacer(Modifier.height(6.dp))
-            Text(
-                text = title,
-                style = MaterialTheme.typography.labelMedium,
-                fontWeight = FontWeight.Bold,
-                color = MaterialTheme.colorScheme.onSurface
-            )
-            Text(
-                text = subtitle,
-                style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant
-            )
         }
     }
 }

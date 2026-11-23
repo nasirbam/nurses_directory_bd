@@ -2,8 +2,6 @@ package com.example.ui.auth
 
 import android.annotation.SuppressLint
 import android.app.Activity
-import android.content.ClipData
-import android.content.ClipboardManager
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
@@ -18,7 +16,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Login
-import androidx.compose.material.icons.filled.ContentCopy
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonColors
 import androidx.compose.material3.ButtonDefaults
@@ -26,7 +23,6 @@ import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -188,12 +184,14 @@ fun onGoogleSignInClicked(
         return
     }
     if (!isFirebaseAvailable(context)) {
-        onAuthError("Firebase config missing in this APK build. Download APK from AI Studio or add GOOGLE_SERVICES_JSON in GitHub Secrets.")
+        Log.e("Auth", "Server configuration unavailable in this build.")
+        onAuthError("অ্যাপের নিরাপত্তা সংযোগ প্রস্তুত নয়। অনুগ্রহ করে অফিসিয়াল সংস্করণ ব্যবহার করুন।")
         return
     }
     val clientId = resolveDefaultWebClientId(context)
     if (clientId == null) {
-        onAuthError("Google Sign-In configuration missing: default_web_client_id not found")
+        Log.e("Auth", "Google Sign-In client ID missing in build resources.")
+        onAuthError("সাইন-ইন সেবা সাময়িকভাবে অনুপলব্ধ। অনুগ্রহ করে কিছুক্ষণ পর আবার চেষ্টা করুন।")
         return
     }
     val signInOption = GetSignInWithGoogleOption.Builder(serverClientId = clientId).build()
@@ -210,7 +208,7 @@ fun onGoogleSignInClicked(
                 Firebase.auth.signInWithCredential(GoogleAuthProvider.getCredential(token, null)).await()
                 onAuthSuccess()
             } else {
-                onAuthError("Unexpected credential type returned from Credential Manager.")
+                onAuthError("গুগল অ্যাকাউন্ট যাচাই করা যায়নি। অনুগ্রহ করে আবার চেষ্টা করুন।")
             }
         } catch (e: GetCredentialCancellationException) {
             Log.w(
@@ -220,29 +218,20 @@ fun onGoogleSignInClicked(
             )
             val cancelMsg = when {
                 installedSha1 != null && KNOWN_REGISTERED_SHA1S.none { it.equals(installedSha1, ignoreCase = true) } ->
-                    "এই APK-টি এমন Key দিয়ে সাইন করা যার SHA-1 Firebase-এ যুক্ত নেই!\n" +
-                        "ফোনের APK SHA-1:\n$installedSha1\n\n" +
-                        "সমাধান: Firebase Console → Project Settings → com.aistudio.nursesbd.xkpqrm-এ এই SHA-1 যোগ করুন অথবা GitHub Releases থেকে Debug APK ডাউনলোড করুন।"
-                installedSha1 != null ->
-                    "সাইন-ইন সম্পন্ন হয়নি (${e.errorMessage ?: "Play Services cancelled"})।\n" +
-                        "APK SHA-1: $installedSha1\n" +
-                        "ফোনে ইন্টারনেট, স্বয়ংক্রিয় সময় (Auto date & time) ও Google Play Services আপডেট আছে কি না নিশ্চিত করুন।"
+                    "এই অ্যাপ সংস্করণে সাইন-ইন অনুমোদিত নয়। অনুগ্রহ করে অফিসিয়াল অ্যাপ ভার্সন ইনস্টল করে চেষ্টা করুন।"
                 else ->
-                    "সাইন-ইন সম্পন্ন হয়নি (${e.errorMessage ?: e.message ?: "Cancelled"})।"
+                    "গুগল সাইন-ইন সম্পন্ন হয়নি। ফোনে ইন্টারনেট সংযোগ ও স্বয়ংক্রিয় সময় (Auto date & time) চালু আছে কি না দেখে আবার চেষ্টা করুন।"
             }
             onAuthCancelled(cancelMsg)
         } catch (e: NoCredentialException) {
             Log.w("Auth", "No Google credentials available: ${e.message}", e)
-            onAuthError("No Google account available on this device or Play Services credential unavailable. Add a Google account in device Settings.")
+            onAuthError("এই ফোনে কোনো গুগল অ্যাকাউন্ট পাওয়া যায়নি। Settings থেকে একটি Google অ্যাকাউন্ট যুক্ত করে আবার চেষ্টা করুন।")
         } catch (e: GetCredentialException) {
-            Log.e("Auth", "Credential Manager error (${e.type}): ${e.errorMessage}", e)
-            onAuthError(
-                "Google Sign-In error (${e.type}): ${e.errorMessage ?: "Check APK SHA-1 & Play Services"}" +
-                    (installedSha1?.let { "\nAPK SHA-1: $it" } ?: "")
-            )
+            Log.e("Auth", "Credential Manager error (${e.type}) sha1=$installedSha1: ${e.errorMessage}", e)
+            onAuthError("সাইন-ইন করতে সমস্যা হয়েছে। Google Play Services ও ইন্টারনেট সংযোগ পরীক্ষা করে আবার চেষ্টা করুন।")
         } catch (e: Exception) {
             Log.e("Auth", "Google Sign-In failed", e)
-            onAuthError(e.localizedMessage ?: "Sign in failed")
+            onAuthError("সাইন-ইন সম্পন্ন হয়নি। অনুগ্রহ করে পুনরায় চেষ্টা করুন।")
         }
     }
 }
@@ -277,10 +266,7 @@ fun GoogleSignInButton(
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val credentialManager = remember(context) { CredentialManager.create(context) }
-    val installedSha1 = remember(context) { getAppSigningSha1(context) }
     var isLoading by remember { mutableStateOf(false) }
-    var showSha1Copy by remember { mutableStateOf(false) }
-    var copiedSha1 by remember { mutableStateOf(false) }
 
     Column(
         modifier = modifier.fillMaxWidth(),
@@ -289,24 +275,20 @@ fun GoogleSignInButton(
         Button(
             onClick = {
                 isLoading = true
-                copiedSha1 = false
                 onGoogleSignInClicked(
                     context = context,
                     credentialManager = credentialManager,
                     onAuthSuccess = {
                         isLoading = false
-                        showSha1Copy = false
                         onAuthSuccess()
                     },
                     onAuthError = { msg ->
                         isLoading = false
-                        showSha1Copy = installedSha1 != null
                         onAuthError(msg)
                     },
                     scope = scope,
                     onAuthCancelled = { cancelMsg ->
                         isLoading = false
-                        showSha1Copy = installedSha1 != null
                         onAuthError(cancelMsg)
                     }
                 )
@@ -335,28 +317,6 @@ fun GoogleSignInButton(
                     text = label,
                     style = MaterialTheme.typography.titleSmall,
                     fontWeight = FontWeight.Bold
-                )
-            }
-        }
-
-        if (showSha1Copy && installedSha1 != null) {
-            Spacer(Modifier.height(6.dp))
-            TextButton(
-                onClick = {
-                    val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE) as? ClipboardManager
-                    clipboard?.setPrimaryClip(ClipData.newPlainText("APK SHA-1", installedSha1))
-                    copiedSha1 = true
-                }
-            ) {
-                Icon(
-                    imageVector = Icons.Filled.ContentCopy,
-                    contentDescription = "Copy APK SHA-1",
-                    modifier = Modifier.size(16.dp)
-                )
-                Spacer(Modifier.width(6.dp))
-                Text(
-                    text = if (copiedSha1) "SHA-1 Copied!" else "Copy This APK's SHA-1",
-                    style = MaterialTheme.typography.labelMedium
                 )
             }
         }

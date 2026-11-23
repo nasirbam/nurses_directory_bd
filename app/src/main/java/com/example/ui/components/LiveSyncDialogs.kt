@@ -69,7 +69,7 @@ fun ManageLiveDirectoryConfigDialog(
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         icon = { Icon(Icons.Filled.CloudSync, contentDescription = null) },
-        title = { Text("Live Dynamic Form Options") },
+        title = { Text("Manage Form Options") },
         text = {
             Column(
                 modifier = Modifier
@@ -78,7 +78,7 @@ fun ManageLiveDirectoryConfigDialog(
                 verticalArrangement = Arrangement.spacedBy(12.dp)
             ) {
                 Text(
-                    text = "নতুন পদবি (Designation), কোর্স বা স্পেশালিটি এখান থেকে যোগ করলে কোনো অ্যাপ ডাউনলোড ছাড়াই সবার ফোনে অটোমেটিক আপডেট হয়ে যাবে।",
+                    text = "নতুন পদবি, কোর্স বা স্পেশালিটি যুক্ত করলে তাৎক্ষণিকভাবে সকল ব্যবহারকারীর ফর্ম ও ফিল্টারে প্রদর্শিত হবে।",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -92,7 +92,7 @@ fun ManageLiveDirectoryConfigDialog(
                 }
 
                 DynamicOptionEditorBlock(
-                    title = "Custom Designations (নতুন পদবি)",
+                    title = "Additional Designations",
                     placeholder = "e.g., Nursing Superintendent",
                     inputValue = newDesignation,
                     onInputChange = { newDesignation = it.take(60); errorText = null },
@@ -109,7 +109,7 @@ fun ManageLiveDirectoryConfigDialog(
                 )
 
                 DynamicOptionEditorBlock(
-                    title = "Custom Course Names (নতুন কোর্স)",
+                    title = "Additional Course Names",
                     placeholder = "e.g., Post Basic ICU Nursing",
                     inputValue = newCourse,
                     onInputChange = { newCourse = it.take(80); errorText = null },
@@ -126,7 +126,7 @@ fun ManageLiveDirectoryConfigDialog(
                 )
 
                 DynamicOptionEditorBlock(
-                    title = "Custom Specialties (নতুন বিভাগ)",
+                    title = "Additional Clinical Specialties",
                     placeholder = "e.g., Burn & Plastic Surgery",
                     inputValue = newSpecialty,
                     onInputChange = { newSpecialty = it.take(60); errorText = null },
@@ -155,7 +155,7 @@ fun ManageLiveDirectoryConfigDialog(
                 enabled = !isSaving,
                 modifier = Modifier.testTag("save_directory_config_button")
             ) {
-                Text(if (isSaving) "Syncing..." else "Sync Live Now")
+                Text(if (isSaving) "Saving..." else "Save Changes")
             }
         },
         dismissButton = {
@@ -269,7 +269,7 @@ fun PublishAppReleaseDialog(
     AlertDialog(
         onDismissRequest = { if (!isSaving) onDismiss() },
         icon = { Icon(Icons.Filled.SystemUpdate, contentDescription = null) },
-        title = { Text("App Release & Update Notifier") },
+        title = { Text("Publish App Version") },
         text = {
             Column(
                 modifier = Modifier
@@ -278,7 +278,7 @@ fun PublishAppReleaseDialog(
                 verticalArrangement = Arrangement.spacedBy(10.dp)
             ) {
                 Text(
-                    text = "নতুন APK ভার্সন বা ওয়েব পোর্টাল লিংক সেট করলে পুরোনো অ্যাপ ব্যবহারকারীরা অ্যাপ খুলেই অটোমেটিক 'Update Now' বাটন দেখতে পাবেন (Current: v${BuildConfig.VERSION_NAME} / Code ${BuildConfig.VERSION_CODE})।",
+                    text = "নতুন সংস্করণ যুক্ত করলে পুরোনো ভার্সন ব্যবহারকারীরা ডিরেক্টরি স্ক্রিনে আপডেটের নির্দেশনা দেখতে পাবেন (বর্তমান: v${BuildConfig.VERSION_NAME})।",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -297,7 +297,7 @@ fun PublishAppReleaseDialog(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     Text(
-                        text = "Notify Older Versions Live",
+                        text = "Show Update Notice",
                         style = MaterialTheme.typography.bodyMedium,
                         fontWeight = FontWeight.Medium
                     )
@@ -323,7 +323,7 @@ fun PublishAppReleaseDialog(
                         value = versionName,
                         onValueChange = { versionName = it.take(20); errorText = null },
                         label = { Text("Version Name *") },
-                        placeholder = { Text("e.g., 1.3") },
+                        placeholder = { Text("e.g., 1.4") },
                         singleLine = true,
                         modifier = Modifier
                             .weight(1f)
@@ -334,8 +334,8 @@ fun PublishAppReleaseDialog(
                 OutlinedTextField(
                     value = apkDownloadUrl,
                     onValueChange = { apkDownloadUrl = it.take(300); errorText = null },
-                    label = { Text("APK / Play Store URL (https://...)") },
-                    placeholder = { Text("https://github.com/.../releases/tag/latest-apk") },
+                    label = { Text("Download / Store URL (https://...)") },
+                    placeholder = { Text("https://play.google.com/store/apps/...") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()
@@ -346,7 +346,7 @@ fun PublishAppReleaseDialog(
                     value = webPortalUrl,
                     onValueChange = { webPortalUrl = it.take(300); errorText = null },
                     label = { Text("Web Portal URL (Optional, https://...)") },
-                    placeholder = { Text("https://username.github.io/nursesbd") },
+                    placeholder = { Text("https://nursesbd.org") },
                     singleLine = true,
                     modifier = Modifier
                         .fillMaxWidth()

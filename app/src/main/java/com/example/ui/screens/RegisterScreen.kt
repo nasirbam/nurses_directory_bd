@@ -162,7 +162,7 @@ fun RegisterScreen(
                                 fontWeight = FontWeight.Bold
                             )
                             Text(
-                                text = "লাইভ Cloud Firestore-এ আবেদন জমা দিতে Google Sign-In করুন",
+                                text = "নিবন্ধনের আবেদন জমা দিতে গুগল অ্যাকাউন্ট দিয়ে সাইন-ইন করুন",
                                 style = MaterialTheme.typography.bodySmall,
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -1131,7 +1131,7 @@ fun RegisterScreen(
                     if (lastSubmittedWasAutoApproved) {
                         "প্রোফাইলটি সফলভাবে অনুমোদিত ও সাধারণ নার্স ডিরেক্টরিতে প্রকাশিত হয়েছে।"
                     } else {
-                        "আপনার নিবন্ধন সফলভাবে লাইভ Cloud Firestore-এ জমা হয়েছে (Status: Pending)। অ্যাডমিন অনুমোদনের পর ডিরেক্টরিতে আপনার প্রোফাইল প্রকাশিত হবে।"
+                        "আপনার নিবন্ধনের আবেদন সফলভাবে জমা হয়েছে (Status: Pending)। অ্যাডমিন অনুমোদনের পর ডিরেক্টরিতে আপনার প্রোফাইল প্রকাশিত হবে।"
                     }
                 )
             },
