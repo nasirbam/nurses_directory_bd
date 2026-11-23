@@ -61,11 +61,6 @@ import kotlinx.coroutines.tasks.await
 import kotlinx.coroutines.withContext
 import java.security.MessageDigest
 
-private val KNOWN_REGISTERED_SHA1S = setOf(
-    "BD:BB:D4:A4:A6:3A:2E:CF:06:3F:69:EA:AC:F2:F8:A4:0F:CE:E1:2D",
-    "AF:4D:EA:3D:D5:79:59:00:C5:54:3A:E8:F4:C1:F4:FD:8C:7E:BD:EB"
-)
-
 internal fun FirebaseAuth.authStateFlow(): Flow<FirebaseUser?> = callbackFlow {
     val listener = FirebaseAuth.AuthStateListener { auth ->
         trySend(auth.currentUser)
@@ -216,13 +211,9 @@ fun onGoogleSignInClicked(
                 "Google Sign-In cancelled/rejected. sha1=$installedSha1 msg=${e.errorMessage ?: e.message}",
                 e
             )
-            val cancelMsg = when {
-                installedSha1 != null && KNOWN_REGISTERED_SHA1S.none { it.equals(installedSha1, ignoreCase = true) } ->
-                    "এই অ্যাপ সংস্করণে সাইন-ইন অনুমোদিত নয়। অনুগ্রহ করে অফিসিয়াল অ্যাপ ভার্সন ইনস্টল করে চেষ্টা করুন।"
-                else ->
-                    "গুগল সাইন-ইন সম্পন্ন হয়নি। ফোনে ইন্টারনেট সংযোগ ও স্বয়ংক্রিয় সময় (Auto date & time) চালু আছে কি না দেখে আবার চেষ্টা করুন।"
-            }
-            onAuthCancelled(cancelMsg)
+            onAuthCancelled(
+                "গুগল সাইন-ইন সম্পন্ন হয়নি। ফোনে ইন্টারনেট সংযোগ ও স্বয়ংক্রিয় সময় (Auto date & time) চালু আছে কি না দেখে আবার চেষ্টা করুন।"
+            )
         } catch (e: NoCredentialException) {
             Log.w("Auth", "No Google credentials available: ${e.message}", e)
             onAuthError("এই ফোনে কোনো গুগল অ্যাকাউন্ট পাওয়া যায়নি। Settings থেকে একটি Google অ্যাকাউন্ট যুক্ত করে আবার চেষ্টা করুন।")
