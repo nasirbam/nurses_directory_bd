@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="bn"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Nurses Directory BD</title>
+<style>
+:root{box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px);--bg:#f4f8f7;--card:#fff;--tx:#17302b;--mu:#5d7770;--pr:#0f766e;--bd:#d5e3df;--er:#b42318}
+@media(prefers-color-scheme:dark){:root:not([data-theme=light]){--bg:#0e1a18;--card:#162623;--tx:#e6f2ef;--mu:#9bb5ae;--pr:#2dd4bf;--bd:#27423d;--er:#f97066}}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:15px/1.5 system-ui,"Noto Sans Bengali",sans-serif}
+header{background:var(--pr);color:#fff;padding:12px 16px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+header h1{font-size:18px;margin:0}header button{background:#fff3;color:#fff;border:0;padding:6px 10px;border-radius:8px}
+main{max-width:760px;margin:0 auto;padding:14px}
+.card{background:var(--card);border:1px solid var(--bd);border-radius:12px;padding:14px;margin-bottom:12px}
+label{display:block;font-size:13px;color:var(--mu);margin:10px 0 3px}
+input,select,textarea{width:100%;padding:10px;border:1px solid var(--bd);border-radius:8px;background:var(--bg);color:var(--tx);font:inherit}
+button.p{background:var(--pr);color:#fff;border:0;padding:11px 16px;border-radius:8px;font:inherit;margin-top:14px;width:100%}
+button.s{background:none;border:1px solid var(--pr);color:var(--pr);padding:8px 12px;border-radius:8px;font:inherit;width:100%;margin-top:8px}
+.row{display:grid;grid-template-columns:1fr 1fr;gap:8px}.msg{color:var(--er);font-size:13px;margin-top:8px}
+.tag{display:inline-block;font-size:12px;padding:2px 8px;border-radius:99px;background:var(--bd);margin-right:4px}
+.mu{color:var(--mu);font-size:13px}.tabs{display:flex;gap:6px;margin-bottom:12px;overflow-x:auto}
+.tabs button{flex:none;padding:8px 12px;border-radius:99px;border:1px solid var(--bd);background:var(--card);color:var(--tx)}
+.tabs .on{background:var(--pr);color:#fff;border-color:var(--pr)}
+.act{display:flex;gap:6px;margin-top:10px;flex-wrap:wrap}.act button{flex:1;min-width:80px;padding:8px;border-radius:8px;border:0;color:#fff;font:inherit}
+.note{background:var(--pr);color:#fff;border-radius:10px;padding:10px;margin-bottom:12px}
+#pa{display:none}#pv table{border-collapse:collapse;width:100%;font-size:12px}#pv th,#pv td{border:1px solid var(--bd);padding:4px 6px;text-align:left;white-space:nowrap}#pv th{background:var(--bd)}@media print{header,main{display:none!important}:root{padding:0}body{background:#fff}#pa{display:block;color:#000;background:#fff;font-family:system-ui,"Noto Sans Bengali",sans-serif}#pa table{border-collapse:collapse;width:100%;font-size:12px}#pa th,#pa td{border:1px solid #444;padding:4px 6px;text-align:left}#pa th{background:#e5e5e5}@page{size:A4 landscape;margin:10mm}}
+</style></head><body>
+<header><h1>🩺 Nurses Directory BD</h1><div id="hd"></div></header>
+<main id="app">লোড হচ্ছে…</main><div id="pa"></div>
+<script>
+const DIV={"Dhaka":["Dhaka","Gazipur","Narayanganj","Narsingdi","Manikganj","Munshiganj","Tangail","Kishoreganj","Faridpur","Gopalganj","Madaripur","Rajbari","Shariatpur"],
+"Chattogram":["Chattogram","Cox's Bazar","Cumilla","Feni","Brahmanbaria","Noakhali","Lakshmipur","Chandpur","Rangamati","Khagrachhari","Bandarban"],
+"Rajshahi":["Rajshahi","Bogura","Pabna","Sirajganj","Natore","Naogaon","Chapainawabganj","Joypurhat"],
+"Khulna":["Khulna","Jashore","Satkhira","Bagerhat","Narail","Magura","Jhenaidah","Kushtia","Chuadanga","Meherpur"],
+"Barishal":["Barishal","Bhola","Patuakhali","Pirojpur","Jhalokati","Barguna"],
+"Sylhet":["Sylhet","Moulvibazar","Habiganj","Sunamganj"],
+"Rangpur":["Rangpur","Dinajpur","Kurigram","Gaibandha","Nilphamari","Lalmonirhat","Thakurgaon","Panchagarh"],
+"Mymensingh":["Mymensingh","Jamalpur","Sherpur","Netrokona"]};
+const UPA={"Dhaka":["Savar","Dhamrai","Keraniganj","Nawabganj","Dohar","Dhaka Metro (Thana)"],"Gazipur":["Gazipur Sadar","Kaliakair","Kapasia","Sreepur","Kaliganj"],"Chattogram":["Hathazari","Raozan","Sitakunda","Patiya","Chattogram Metro (Thana)"],"Rajshahi":["Paba","Godagari","Mohanpur","Rajshahi Metro (Thana)"],"Khulna":["Dumuria","Batiaghata","Dacope","Khulna Metro (Thana)"],"Sylhet":["Sylhet Sadar","Beanibazar","Jaintiapur","Golapganj"],"Rangpur":["Rangpur Sadar","Mithapukur","Badarganj","Pirganj"],"Barishal":["Barishal Sadar","Bakerganj","Babuganj","Gournadi"],"Mymensingh":["Mymensingh Sadar","Trishal","Muktagachha","Phulpur"]};
+const CAT={"Govt. Nurse/Midwife":["Senior Staff Nurse","Staff Nurse","Midwife","Nursing Instructor","Lecturer","Principal"],"Non-Govt. Nurse/Midwife":["Senior Staff Nurse","Staff Nurse","Midwife","Nursing Instructor","Lecturer","Principal"],"Student Nurse/Midwife":["Student Nurse","Student Midwife"]};
+const EDU=["Diploma in Nursing Science & Midwifery","Diploma in Midwifery","B.Sc in Nursing","Post Basic B.Sc in Nursing","B.Sc in Public Health Nursing","M.Sc in Nursing","Other"];
+const F=["category","name","father","mother","dob","joinDate","bnmc","designation","workplace","division","district","upazila","address","education","eduCat","eduSub","eduInfo","email"];
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const H=async s=>[...new Uint8Array(await crypto.subtle.digest("SHA-256",new TextEncoder().encode("ndbd:"+s)))].map(b=>b.toString(16).padStart(2,"0")).join("");
+let store=null,all=[],me=null,tab="dir",msg="",view="login",editing=null,note="";
+async function init(){
+ try{const db=await claude.use("db");if(db){const col=db.collection("nurses");store={set:(id,d)=>col.doc(id).set(d),del:id=>col.doc(id).delete()};
+  col.onSnapshot(s=>{all=s.docs.map(d=>d.data());ensureAdmin();draw()},()=>{});setTimeout(()=>{if(!all.length)ensureAdmin()},1500);return}}catch(e){}
+ const L=()=>JSON.parse(localStorage.getItem("ndbd")||"[]");
+ store={set:async(id,d)=>{const a=L().filter(x=>x.phone!==id);a.push(d);localStorage.setItem("ndbd",JSON.stringify(a));all=a;draw()},del:async id=>{all=L().filter(x=>x.phone!==id);localStorage.setItem("ndbd",JSON.stringify(all));draw()}};
+ all=L();ensureAdmin();draw();
+}
+let adminMade=false;
+async function ensureAdmin(){if(adminMade||!store)return;if(all.some(x=>x.role=="admin")){adminMade=true;return}adminMade=true;
+ await store.set("admin",{phone:"admin",role:"admin",name:"Administrator",pw:await H("admin123"),mustChange:true,status:"approved"})}
+const prl=d=>{if(!d)return"";const x=new Date(d);x.setFullYear(x.getFullYear()+59);return x.toLocaleDateString("en-GB",{day:"2-digit",month:"long",year:"numeric"})};
+function draw(){
+ $("#hd").innerHTML=me?`<span style="color:#fff">${esc(me.name)}</span> <button onclick="out()">Logout</button>`:(view=="admin"?"":`<button onclick="view='admin';msg='';draw()">🔐 Admin Login</button>`);
+ if(!me){if(view!="register"&&view!="admin"&&view!="forgot")view="login";$("#app").innerHTML=view=="register"?regForm():view=="admin"?adminForm():view=="forgot"?forgotForm():loginForm();return}
+ const cur=all.find(x=>x.phone==me.phone);if(cur)me=cur;
+ if(me.mustChange){$("#app").innerHTML=pwForm(true);return}
+ const adm=me.role=="admin",pend=all.filter(x=>x.role=="user"&&(x.status=="pending"||x.pendingEdit||x.resetReq)).length,n=note;note="";
+ const T=(k,l)=>`<button class="${tab==k&&!editing?"on":""}" onclick="tab='${k}';editing=null;msg='';draw()">${l}</button>`;
+ let t=`<div class="tabs">${T("dir","Directory")}${adm?T("pend","Requests ("+pend+")")+T("all","All Users"):T("me","My Profile")}${T("pw","Password")}</div>`+(n?`<div class="note">${esc(n)}</div>`:"");
+ let body=editing?regForm(true):tab=="dir"?dirView():tab=="pend"&&adm?pendView():tab=="all"&&adm?allView():tab=="me"?meView():tab=="pw"?pwForm(false):"";
+ $("#app").innerHTML=t+body;
+ if(editing){const u=all.find(x=>x.phone==editing);if(u)fill(u)}else if(tab=="dir")filt();
+}
+function loginForm(){return`<div class="card"><h3>Login</h3><label>Phone number (User ID)</label><input id="lp" inputmode="tel" placeholder="01XXXXXXXXX"><label>Password</label><input id="lw" type="password" onkeydown="event.key=='Enter'&&login()"><button class="p" onclick="login()">Login</button><div class="msg">${esc(msg)}</div><button class="s" onclick="view='forgot';msg='';draw()">Password ভুলে গেছেন?</button><button class="s" onclick="view='register';msg='';draw()">Register (নতুন নিবন্ধন)</button></div>`}
+function adminForm(){return`<div class="card"><h3>🔐 Admin Panel Login</h3><label>Admin ID</label><input id="ap" autocomplete="off"><label>Password</label><input id="aw" type="password" onkeydown="event.key=='Enter'&&adminLogin()"><button class="p" onclick="adminLogin()">Login as Admin</button><div class="msg">${esc(msg)}</div><button class="s" onclick="view='login';msg='';draw()">Back</button></div>`}
+function forgotForm(){return`<div class="card"><h3>Password Reset Request</h3><p class="mu">আপনার নিবন্ধিত Phone নম্বর দিন। Admin অনুরোধ approve করলে password reset হবে এবং আপনি নতুন password সেট করতে পারবেন।</p><label>Phone number</label><input id="fp" inputmode="tel" placeholder="01XXXXXXXXX"><button class="p" onclick="sendReset()">Admin কে অনুরোধ পাঠান</button><div class="msg" style="${msg.startsWith('✅')?'color:var(--pr)':''}">${esc(msg)}</div><button class="s" onclick="view='login';msg='';draw()">Back to Login</button></div>`}
+async function sendReset(){const p=$("#fp").value.trim(),u=all.find(x=>x.phone==p&&x.role=="user"&&x.status=="approved");
+ if(!u){msg="এই নম্বরে কোনো approved account পাওয়া যায়নি";return draw()}
+ await store.set(p,{...u,resetReq:{at:new Date().toISOString()}});msg="✅ অনুরোধ Admin এর কাছে পাঠানো হয়েছে। Approve হলে আবার login করুন।";draw()}
+async function adminLogin(){const p=$("#ap").value.trim(),pw=$("#aw").value;let u=all.find(x=>x.role=="admin"&&x.phone==p);
+ if(!u&&p=="admin"&&pw=="admin123"){u={phone:"admin",role:"admin",name:"Administrator",pw:await H("admin123"),mustChange:true,status:"approved"};await store.set("admin",u)}
+ if(!u||u.pw!==await H(pw)){msg="Admin ID বা Password ভুল";return draw()}
+ msg="";me=u;tab="pend";draw()}
+async function login(){const p=$("#lp").value.trim(),w=await H($("#lw").value),u=all.find(x=>x.phone==p&&x.role=="user");
+ if(!u||u.pw!==w){msg="Phone বা Password ভুল";return draw()}
+ if(u.status=="pending"){msg="আপনার আবেদন এখনো Admin approval এর অপেক্ষায়";return draw()}
+ if(u.status=="rejected"){msg="আপনার আবেদন বাতিল করা হয়েছে";return draw()}
+ msg="";me=u;tab="dir";draw()}
+function out(){me=null;editing=null;view="login";draw()}
+const opt=(a,ph)=>`<option value="">${ph}</option>`+a.map(x=>`<option>${esc(x)}</option>`).join("");
+function regForm(ed){const adm=me&&me.role=="admin";return`<div class="card"><h3>${ed?(adm?"তথ্য সম্পাদনা (Admin)":"তথ্য Edit / বদলি (Admin approval লাগবে)"):"Nurse Registration"}</h3>
+<label>Category</label><select id="r_cat" onchange="cat()">${opt(Object.keys(CAT),"Select category")}</select>
+<label>Name</label><input id="r_name"><label>Father's Name</label><input id="r_fa"><label>Mother's Name</label><input id="r_mo">
+<label>Date of Birth</label><input id="r_dob" type="date" onchange="$('#r_prl').textContent=prl(this.value)?'PRL Date: '+prl(this.value):''"><div id="r_prl" class="mu"></div>
+<label>Joining Date (চাকরিতে/বর্তমান কর্মস্থলে যোগদানের তারিখ)</label><input id="r_jd" type="date">
+<label>Phone number (User ID)</label><input id="r_ph" inputmode="tel" placeholder="01XXXXXXXXX" ${ed?"readonly":""}><label>BNMC Reg no.</label><input id="r_bn">
+<label>Designation</label><select id="r_des"><option value="">Select category first</option></select>
+<label>Working Place (Institute/Hospital name)</label><input id="r_wp">
+<div class="row"><div><label>Division</label><select id="r_dv" onchange="dv()">${opt(Object.keys(DIV),"Division")}</select></div><div><label>District</label><select id="r_di" onchange="di()"><option value="">District</option></select></div></div>
+<label>Upazila/Thana</label><div id="r_upw"><select id="r_up"><option value="">Select district first</option></select></div>
+<label>Address</label><textarea id="r_ad" rows="2"></textarea>
+<label>Educational Qualification — Category</label><select id="r_ec" onchange="ec()">${opt(["Nursing","HSC","SSC"],"Select")}</select>
+<div id="r_esw" style="display:none"><label>Nursing — Sub Category</label><select id="r_es">${opt(EDU,"Select")}</select></div>
+<label>Passing Institute & Year</label><input id="r_ei">
+<label>Email (optional)</label><input id="r_em" type="email">
+<button class="p" onclick="${ed?"save()":"reg()"}">${ed?(adm?"Save Changes":"Send to Admin for Approval"):"Submit for Approval"}</button><div class="msg">${esc(msg)}</div>
+<button class="s" onclick="${ed?"editing=null":"view='login'"};msg='';draw()">${ed?"Cancel":"Back to Login"}</button></div>`}
+function cat(){$("#r_des").innerHTML=opt(CAT[$("#r_cat").value]||[],"Select")}
+function dv(){$("#r_di").innerHTML=opt(DIV[$("#r_dv").value]||[],"District");di()}
+function di(){const u=UPA[$("#r_di").value];$("#r_upw").innerHTML=u?`<select id="r_up">${opt(u.concat(["Other"]),"Upazila/Thana")}</select>`:`<input id="r_up" placeholder="Upazila/Thana লিখুন">`}
+function ec(){$("#r_esw").style.display=$("#r_ec").value=="Nursing"?"block":"none"}
+function sv(i,v){const e=$("#r_"+i);if(!e)return;v=v||"";if(e.tagName=="SELECT"&&v&&![...e.options].some(o=>o.value==v))e.add(new Option(v,v));e.value=v}
+function fill(u){sv("cat",u.category);cat();sv("des",u.designation);sv("name",u.name);sv("fa",u.father);sv("mo",u.mother);sv("dob",u.dob);$("#r_prl").textContent=u.dob?"PRL Date: "+prl(u.dob):"";sv("jd",u.joinDate);sv("ph",u.phone);sv("bn",u.bnmc);sv("wp",u.workplace);
+ sv("dv",u.division);dv();sv("di",u.district);di();sv("up",u.upazila);sv("ad",u.address);sv("ec",u.eduCat);ec();sv("es",u.eduSub);sv("ei",u.eduInfo);sv("em",u.email)}
+function collect(){const g=i=>$("#r_"+i).value.trim(),c=g("ec"),s=g("es");
+ return{category:g("cat"),name:g("name"),father:g("fa"),mother:g("mo"),dob:g("dob"),joinDate:g("jd"),phone:g("ph"),bnmc:g("bn"),designation:g("des"),workplace:g("wp"),division:g("dv"),district:g("di"),upazila:g("up"),address:g("ad"),eduCat:c,eduSub:c=="Nursing"?s:"",education:c=="Nursing"?(s?"Nursing — "+s:""):c,eduInfo:g("ei"),email:g("em")}}
+function check(d){for(const k of["category","name","father","mother","dob","joinDate","phone","bnmc","designation","workplace","division","district","upazila","education"])if(!d[k])return"সব বাধ্যতামূলক তথ্য দিন ("+k+")";
+ if(!/^01[3-9]\d{8}$/.test(d.phone))return"সঠিক ১১ ডিজিটের মোবাইল নম্বর দিন";return""}
+async function reg(){const d=collect();msg=check(d);if(msg)return draw();
+ if(all.some(x=>x.phone==d.phone)){msg="এই নম্বর আগেই নিবন্ধিত";return draw()}
+ d.prl=prl(d.dob);d.role="user";d.status="pending";d.mustChange=true;d.pw=await H("1234");d.createdAt=new Date().toISOString();
+ await store.set(d.phone,d);msg="";view="login";$("#app").innerHTML=`<div class="card"><h3>✅ আবেদন জমা হয়েছে</h3><p>Admin approve করলে আপনি Phone নম্বর ও Password <b>1234</b> দিয়ে login করতে পারবেন। প্রথমবার login এ password বদলাতে হবে।</p><button class="p" onclick="draw()">Login এ যান</button></div>`}
+async function save(){const d=collect();msg=check(d);if(msg)return draw();d.prl=prl(d.dob);const u=all.find(x=>x.phone==editing);
+ if(me.role=="admin"){await store.set(u.phone,{...u,...d,pendingEdit:null});note="তথ্য আপডেট হয়েছে ✅"}
+ else{await store.set(u.phone,{...u,pendingEdit:{...d,requestedAt:new Date().toISOString()}});note="আপনার পরিবর্তনের অনুরোধ Admin এর কাছে পাঠানো হয়েছে। Approve হলে তথ্য আপডেট হবে।"}
+ editing=null;msg="";draw()}
+function pwForm(f){return`<div class="card"><h3>${f?"প্রথমবার Password পরিবর্তন করুন":"Change Password"}</h3><label>New Password (min 4)</label><input id="np" type="password"><label>Confirm</label><input id="np2" type="password"><button class="p" onclick="chpw()">Save</button><div class="msg">${esc(msg)}</div></div>`}
+async function chpw(){const a=$("#np").value;if(a.length<4||a!==$("#np2").value||a=="1234"||a=="admin123"){msg="Password কমপক্ষে ৪ অক্ষর, মিলতে হবে এবং default password হওয়া যাবে না";return draw()}
+ const u={...me,pw:await H(a),mustChange:false};msg="";await store.set(u.phone,u);me=u;tab=u.role=="admin"?"pend":"dir";draw()}
+const PF=[["name","Name"],["father","Father's Name"],["mother","Mother's Name"],["dob","Date of Birth"],["prl","PRL Date"],["joinDate","Joining Date"],["phone","Phone"],["bnmc","BNMC Reg no."],["category","Category"],["designation","Designation"],["workplace","Hospital / Working Place"],["division","Division"],["district","District"],["upazila","Upazila/Thana"],["address","Address"],["education","Education"],["email","Email"]];
+let pcols=PF.map(x=>x[0]);
+const ALLD=Object.values(DIV).flat().sort();
+const gv=(x,k)=>k=="prl"?prl(x.dob):(x[k]||"");
+function dirView(){return`<div class="card"><input id="q" placeholder="Name / Phone / BNMC search…" oninput="filt()">
+<div class="row" style="margin-top:8px"><select id="fc" onchange="filt()">${opt(Object.keys(CAT),"All categories")}</select><select id="fs" onchange="filt()">${opt([...new Set(Object.values(CAT).flat())],"All designations")}</select></div>
+<div class="row" style="margin-top:8px"><select id="fd" onchange="fdv()">${opt(Object.keys(DIV),"All divisions")}</select><select id="fi" onchange="fdi();filt()">${opt(ALLD,"All districts")}</select></div>
+<div class="row" style="margin-top:8px"><div id="fuw"><input id="fu" placeholder="Upazila/Thana" oninput="filt()"></div><input id="fh" placeholder="Hospital / Institute name" oninput="filt()"></div>
+<button class="s" onclick="rf()">Filter clear</button></div>
+${me&&me.role=="admin"?`<details class="card" open><summary><b>🖨️ Print Options (Admin)</b></summary><p class="mu">যে তথ্যগুলো print করতে চান সেগুলোতে tick দিন:</p>
+<div class="row">${PF.map(([k,l])=>`<label style="display:flex;gap:6px;align-items:center;margin:3px 0;color:var(--tx);font-size:14px"><input type="checkbox" style="width:auto" ${pcols.includes(k)?"checked":""} onchange="pc('${k}',this.checked)">${l}</label>`).join("")}</div>
+<div class="row"><button class="s" onclick="pall(1)">Select all</button><button class="s" onclick="pall(0)">Clear all</button></div>
+<button class="p" onclick="doPrint()">🖨️ Print (<span id="pn">0</span> জন)</button><div class="msg" id="pm"></div><div id="pv" style="overflow-x:auto;margin-top:10px"></div></details>`:""}<div id="list"></div>`}
+function pc(k,on){pcols=on?[...new Set([...pcols,k])]:pcols.filter(x=>x!=k)}
+function pall(on){pcols=on?PF.map(x=>x[0]):[];draw()}
+function fdv(){$("#fi").innerHTML=opt(DIV[$("#fd").value]||ALLD,"All districts");fdi();filt()}
+function fdi(){const u=UPA[$("#fi").value];$("#fuw").innerHTML=u?`<select id="fu" onchange="filt()">${opt(u.concat(["Other"]),"All upazila/thana")}</select>`:`<input id="fu" placeholder="Upazila/Thana" oninput="filt()">`}
+function rf(){draw()}
+function res(){const q=($("#q").value||"").toLowerCase(),c=$("#fc").value,d=$("#fd").value,s=$("#fs").value,i=$("#fi").value,u=($("#fu").value||"").toLowerCase(),h=($("#fh").value||"").toLowerCase();
+ return all.filter(x=>x.role=="user"&&x.status=="approved"&&(!c||x.category==c)&&(!d||x.division==d)&&(!s||x.designation==s)&&(!i||x.district==i)&&(!u||(x.upazila||"").toLowerCase().includes(u))&&(!h||(x.workplace||"").toLowerCase().includes(h))&&(!q||[x.name,x.phone,x.bnmc].join(" ").toLowerCase().includes(q)))}
+function filt(){const r=res(),pn=$("#pn");if(pn)pn.textContent=r.length;$("#list").innerHTML=`<p class="mu">${r.length} জন পাওয়া গেছে</p>`+r.map(x=>profView(x)).join("")}
+function doPrint(){if(!me||me.role!="admin")return;const r=res(),cols=PF.filter(p=>pcols.includes(p[0]));
+ if(!cols.length){$("#pm").textContent="কমপক্ষে একটি তথ্যে tick দিন";return}
+ if(!r.length){$("#pm").textContent="Print করার মতো কোনো তথ্য নেই";return}$("#pm").textContent="";
+ const f=[["fd","Division"],["fi","District"],["fu","Upazila/Thana"],["fh","Hospital"],["fc","Category"],["fs","Designation"]].map(([i,l])=>$("#"+i).value?l+": "+$("#"+i).value:"").filter(Boolean).join(" | ");
+ $("#pa").innerHTML=`<h2 style="margin:0">Nurses Directory BD</h2><p style="margin:4px 0 10px">${esc(f||"All records")} — মোট: ${r.length} জন — ${new Date().toLocaleDateString("en-GB")}</p><table><thead><tr><th>#</th>${cols.map(c=>`<th>${c[1]}</th>`).join("")}</tr></thead><tbody>${r.map((x,n)=>`<tr><td>${n+1}</td>${cols.map(c=>`<td>${esc(gv(x,c[0]))}</td>`).join("")}</tr>`).join("")}</tbody></table>`;
+ $("#pv").innerHTML=$("#pa").innerHTML;try{window.print()}catch(e){$("#pm").textContent="এই browser এ print বন্ধ আছে"}}
+function profView(x,extra=""){return`<div class="card"><b>${esc(x.name)}</b> <span class="tag">${esc(x.designation)}</span><br><span class="tag">${esc(x.category)}</span>${x.status&&x.status!="approved"?`<span class="tag">${esc(x.status)}</span>`:""}
+<div class="mu" style="margin-top:6px">📞 <a href="tel:${esc(x.phone)}">${esc(x.phone)}</a> · BNMC: ${esc(x.bnmc)}<br>🏥 ${esc(x.workplace)}<br>📍 ${esc(x.upazila)}, ${esc(x.district)}, ${esc(x.division)}${x.address?" — "+esc(x.address):""}<br>🎓 ${esc(x.education)}${x.eduInfo?" ("+esc(x.eduInfo)+")":""}<br>Father: ${esc(x.father)} · Mother: ${esc(x.mother)}<br>DOB: ${esc(x.dob)} · <b>PRL: ${esc(prl(x.dob))}</b><br>Joining Date: ${esc(x.joinDate||"—")}${x.email?"<br>✉️ "+esc(x.email):""}</div>${extra}</div>`}
+function meView(){return(me.pendingEdit?`<div class="note">⏳ আপনার তথ্য পরিবর্তনের অনুরোধ Admin approval এর অপেক্ষায় আছে</div>`:"")+profView(me,`<button class="p" onclick="editing='${me.phone}';msg='';draw()">✏️ তথ্য Edit / বদলি Request</button>`)}
+function pendView(){const reg=all.filter(x=>x.role=="user"&&x.status=="pending"),eds=all.filter(x=>x.role=="user"&&x.status=="approved"&&x.pendingEdit);
+ const B=(a,b)=>`<div class="act"><button style="background:#0f766e" onclick="${a}">Approve</button><button style="background:#b42318" onclick="${b}">Reject</button></div>`;
+ return`<h4>নতুন নিবন্ধন (${reg.length})</h4>`+(reg.map(x=>profView(x,B(`setSt('${x.phone}','approved')`,`setSt('${x.phone}','rejected')`))).join("")||`<p class="mu">কোনো pending আবেদন নেই</p>`)+
+ `<h4>তথ্য পরিবর্তন / বদলির অনুরোধ (${eds.length})</h4>`+(eds.map(x=>profView({...x,...x.pendingEdit},`<p class="mu">পুরাতন কর্মস্থল: ${esc(x.workplace)} (${esc(x.district)})</p>`+B(`setEd('${x.phone}',1)`,`setEd('${x.phone}',0)`))).join("")||`<p class="mu">কোনো অনুরোধ নেই</p>`)+`<h4>Password reset অনুরোধ</h4>`+(all.filter(x=>x.role=="user"&&x.resetReq).map(x=>`<div class="card"><b>${esc(x.name)}</b> · ${esc(x.phone)}<br><span class="mu">${esc(x.designation)}, ${esc(x.workplace)}</span><div class="act"><button style="background:#0f766e" onclick="doReset('${x.phone}')">Reset Password</button><button style="background:#b42318" onclick="clrReset('${x.phone}')">Reject</button></div></div>`).join("")||`<p class="mu">কোনো অনুরোধ নেই</p>`)}
+async function doReset(p){await store.set(p,{...all.find(x=>x.phone==p),pw:await H("1234"),mustChange:true,resetReq:null});note="Password reset হয়েছে ✅ ইউজার পরবর্তী login এ নতুন password দেবে";draw()}
+async function clrReset(p){await store.set(p,{...all.find(x=>x.phone==p),resetReq:null})}
+async function setSt(p,s){await store.set(p,{...all.find(x=>x.phone==p),status:s})}
+async function setEd(p,ok){const u=all.find(x=>x.phone==p);await store.set(p,ok?{...u,...u.pendingEdit,pendingEdit:null}:{...u,pendingEdit:null})}
+function allView(){const u=all.filter(x=>x.role=="user"),ap=u.filter(x=>x.status=="approved");
+ return`<div class="card"><b>মোট নিবন্ধিত:</b> ${u.length} · <b>Approved:</b> ${ap.length}<br>`+Object.keys(CAT).map(c=>`${c}: ${ap.filter(x=>x.category==c).length}`).join("<br>")+`</div>`+
+ u.map(x=>profView(x,`<div class="act"><button style="background:#0f766e" onclick="editing='${x.phone}';msg='';draw()">Edit</button><button style="background:#6b7280" onclick="rst('${x.phone}')">Reset Password</button><button style="background:#b42318" onclick="del('${x.phone}')">Delete</button></div>`)).join("")}
+async function del(p){if(confirm("এই ইউজারকে স্থায়ীভাবে Delete করবেন?"))await store.del(p)}
+async function rst(p){if(confirm("Password default এ reset করবেন? ইউজারকে পরবর্তী login এ বদলাতে হবে।")){await store.set(p,{...all.find(x=>x.phone==p),pw:await H("1234"),mustChange:true});note="Password reset হয়েছে ✅";draw()}}
+init();
+</script></body></html>
